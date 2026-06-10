@@ -51,8 +51,83 @@ def _normalize_joints(j: np.ndarray, bb: np.ndarray) -> np.ndarray:
     return out
 
 
+def _window_arrays(con, match_id: str, center: int):
+    """(JnB (t,2,36,2), shuttle (t,2)) for the ±HALF window around a video frame."""
+    f0, f1 = center - HALF, center + HALF
+    joints = np.zeros((f1 - f0 + 1, 2, 17, 2), np.float32)
+    bbox = np.zeros((f1 - f0 + 1, 2, 4), np.float32)
+    for f, pid, kps, bb in con.execute(
+            "SELECT frame_num, player_id, keypoints, bbox FROM tracks "
+            "WHERE match_id=? AND frame_num BETWEEN ? AND ?",
+            [match_id, f0, f1]).fetchall():
+        m = 0 if pid == "far" else 1                       # Top before Bottom
+        t = int(f) - f0
+        if kps is not None:
+            k = np.asarray(kps, np.float32).reshape(17, 3)
+            joints[t, m] = k[:, :2]
+        if bb is not None:
+            x, y, w, h = bb                                # ours: center x,y,w,h
+            bbox[t, m] = (x - w / 2, y - h / 2, x + w / 2, y + h / 2)
+
+    sh = np.zeros((f1 - f0 + 1, 2), np.float32)
+    for f, sx, sy in con.execute(
+            "SELECT frame_num, img_x, img_y FROM shuttle WHERE match_id=? "
+            "AND visible AND frame_num BETWEEN ? AND ?",
+            [match_id, f0, f1]).fetchall():
+        sh[int(f) - f0] = (sx / VID_W, sy / VID_H)
+
+    jn = np.stack([_normalize_joints(joints[t], bbox[t]) for t in range(len(joints))])
+    pos_dummy = np.zeros((len(jn), 2, 2), np.float32)
+    jn, _, sh, _ = make_seq_len_same(SEQ_LEN, jn, pos_dummy, sh)
+    bones = create_bones(jn, PAIRS)
+    return np.concatenate((jn, bones), axis=-2), sh
+
+
+def _load_net() -> "BST_0":
+    net = BST_0(in_dim=(17 + len(PAIRS)) * 2, n_class=len(CLASSES),
+                seq_len=SEQ_LEN, depth_tem=2, depth_inter=1)
+    net.load_state_dict(torch.load(WEIGHTS, map_location="cpu", weights_only=False))
+    net.eval()
+    return net
+
+
+def _forward(net, JnB: np.ndarray, sh: np.ndarray, batch: int) -> np.ndarray:
+    """Softmax probabilities (n, n_classes)."""
+    probs = []
+    with torch.no_grad():
+        for i in range(0, len(JnB), batch):
+            x = torch.from_numpy(JnB[i:i + batch])
+            x = x.view(*x.shape[:-2], -1)                  # (b, t, 2, 72)
+            s = torch.from_numpy(sh[i:i + batch])
+            vl = torch.full((len(x),), SEQ_LEN, dtype=torch.long)
+            probs.append(torch.softmax(net(x, s, vl), dim=1))
+    return torch.cat(probs).numpy()
+
+
+def classify_centers(match_id: str, centers: list[int], batch: int = 256) -> list[dict]:
+    """BST predictions for arbitrary window centers (video frames) — the interface
+    pipeline.py uses at DETECTED hit frames. Returns side/shot/conf per center."""
+    con = db.connect(read_only=True)
+    arrays = [_window_arrays(con, match_id, int(c)) for c in centers]
+    con.close()
+    JnB = np.stack([a[0] for a in arrays]).astype(np.float32)
+    sh = np.stack([a[1] for a in arrays]).astype(np.float32)
+    probs = _forward(_load_net(), JnB, sh, batch)
+    out = []
+    for c, p in zip(centers, probs):
+        i = int(p.argmax())
+        name = CLASSES[i]
+        unknown = name == "未知球種"
+        out.append(dict(
+            frame=int(c), conf=float(p[i]),
+            side=None if unknown else ("far" if name.startswith("Top_") else "near"),
+            shot=None if unknown else
+            shuttleset.canonical_shot_type(name.split("_", 1)[1])))
+    return out
+
+
 def build_inputs(match_id: str):
-    """(JnB, shuttle, video_len, labels) for every labeled stroke with a known class."""
+    """(JnB, shuttle, labels, ids) for every labeled stroke with a known class."""
     from . import hits
     sdf = insights.stroke_df(match_id)
     smap = insights.side_map_from(sdf)
@@ -66,37 +141,8 @@ def build_inputs(match_id: str):
         if en is None or side is None:
             continue
         ids.append((int(s["set_no"]), int(s["rally_id"]), int(s["ball_round"])))
-        c = int(s["frame_num"]) + off
-        f0, f1 = c - HALF, c + HALF
-
-        joints = np.zeros((f1 - f0 + 1, 2, 17, 2), np.float32)
-        bbox = np.zeros((f1 - f0 + 1, 2, 4), np.float32)
-        for f, pid, kps, bb in con.execute(
-                "SELECT frame_num, player_id, keypoints, bbox FROM tracks "
-                "WHERE match_id=? AND frame_num BETWEEN ? AND ?",
-                [match_id, f0, f1]).fetchall():
-            m = 0 if pid == "far" else 1                   # Top before Bottom
-            t = int(f) - f0
-            if kps is not None:
-                k = np.asarray(kps, np.float32).reshape(17, 3)
-                joints[t, m] = k[:, :2]
-            if bb is not None:
-                x, y, w, h = bb                            # ours: center x,y,w,h
-                bbox[t, m] = (x - w / 2, y - h / 2, x + w / 2, y + h / 2)
-
-        sh = np.zeros((f1 - f0 + 1, 2), np.float32)
-        for f, sx, sy in con.execute(
-                "SELECT frame_num, img_x, img_y FROM shuttle WHERE match_id=? "
-                "AND visible AND frame_num BETWEEN ? AND ?",
-                [match_id, f0, f1]).fetchall():
-            sh[int(f) - f0] = (sx / VID_W, sy / VID_H)
-
-        jn = np.stack([_normalize_joints(joints[t], bbox[t])
-                       for t in range(len(joints))])
-        pos_dummy = np.zeros((len(jn), 2, 2), np.float32)
-        jn, _, sh, _ = make_seq_len_same(SEQ_LEN, jn, pos_dummy, sh)
-        bones = create_bones(jn, PAIRS)
-        JnBs.append(np.concatenate((jn, bones), axis=-2))   # (t, 2, 36, 2)
+        jnb, sh = _window_arrays(con, match_id, int(s["frame_num"]) + off)
+        JnBs.append(jnb)
         shuttles.append(sh)
         labels.append(("Top_" if side == "far" else "Bottom_", en))
     con.close()
@@ -109,20 +155,7 @@ def predict_df(match_id: str, batch: int = 256):
     import pandas as pd
 
     JnB, sh, labels, ids = build_inputs(match_id)
-    net = BST_0(in_dim=(17 + len(PAIRS)) * 2, n_class=len(CLASSES),
-                seq_len=SEQ_LEN, depth_tem=2, depth_inter=1)
-    net.load_state_dict(torch.load(WEIGHTS, map_location="cpu", weights_only=False))
-    net.eval()
-
-    preds = []
-    with torch.no_grad():
-        for i in range(0, len(JnB), batch):
-            x = torch.from_numpy(JnB[i:i + batch])
-            x = x.view(*x.shape[:-2], -1)                  # (b, t, 2, 72)
-            s = torch.from_numpy(sh[i:i + batch])
-            vl = torch.full((len(x),), SEQ_LEN, dtype=torch.long)
-            preds.append(net(x, s, vl).argmax(1))
-    preds = torch.cat(preds).numpy()
+    preds = _forward(_load_net(), JnB, sh, batch).argmax(1)
 
     rows = []
     for p, (side, en), (sn, rid, br) in zip(preds, labels, ids):

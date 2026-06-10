@@ -106,14 +106,45 @@ def build_strokes(match_id: str) -> pd.DataFrame:
     return df
 
 
-def classify(df: pd.DataFrame, train_match: str) -> pd.DataFrame:
-    """Predict shot_type for pipeline strokes with a model trained on ANOTHER match."""
+def classify(df: pd.DataFrame, train_match: str, use_bst: bool = True) -> pd.DataFrame:
+    """Predict shot_type for pipeline strokes.
+
+    Primary: pretrained BST-0 at the DETECTED hit frames (bst_eval.classify_centers);
+    its side prediction (98% accurate) also overrides wrist attribution — hitter,
+    receiver, and their positions are swapped where they disagree.
+    Fallback: the geometry classifier trained on the OTHER match (also used for any
+    stroke BST calls 'unknown', or when the BST weights are missing).
+    """
     tr = shotclass.build_features(train_match, feet_landing=True)
     clf = shotclass._model().fit(tr[shotclass.CV_FEATURES], tr["shot"])
     X = df[shotclass.CV_FEATURES]
     df = df.copy()
     df["shot_type"] = clf.predict(X)
     df["shot_type_conf"] = clf.predict_proba(X).max(axis=1)
+    df["classifier"] = "geometry"
+
+    if not use_bst:
+        return df
+    try:
+        from . import bst_eval
+        if not bst_eval.WEIGHTS.exists():
+            raise FileNotFoundError(bst_eval.WEIGHTS)
+        match_id = df["match_id"].iloc[0]
+        preds = bst_eval.classify_centers(match_id, df["frame_num"].tolist())
+    except Exception as e:                                  # missing weights/deps
+        print(f"[pipeline] BST unavailable ({e}); geometry only")
+        return df
+
+    swap = {"hitter": "receiver", "receiver": "hitter",
+            "hitter_x": "receiver_x", "receiver_x": "hitter_x",
+            "hitter_y": "receiver_y", "receiver_y": "hitter_y"}
+    for i, p in zip(df.index, preds):
+        if p["shot"] is None:
+            continue                                        # keep geometry fallback
+        df.loc[i, ["shot_type", "shot_type_conf", "classifier"]] = \
+            (p["shot"], p["conf"], "bst")
+        if p["side"] is not None and p["side"] != df.at[i, "hitter"]:
+            df.loc[i, list(swap)] = df.loc[i, list(swap.values())].to_numpy()
     return df
 
 
@@ -144,9 +175,10 @@ def write_strokes(match_id: str, df: pd.DataFrame) -> int:
     return len(df)
 
 
-def evaluate(match_id: str, train_match: str, verbose: bool = True) -> dict:
+def evaluate(match_id: str, train_match: str, verbose: bool = True,
+             use_bst: bool = True) -> dict:
     """End-to-end agreement of pipeline strokes vs ShuttleSet labels."""
-    df = classify(build_strokes(match_id), train_match)
+    df = classify(build_strokes(match_id), train_match, use_bst=use_bst)
     sdf = insights.stroke_df(match_id)
     smap = insights.side_map_from(sdf)
 
@@ -199,9 +231,10 @@ if __name__ == "__main__":
                     help="match whose LABELS train the shot classifier "
                          "(default: the other wired match)")
     ap.add_argument("--write", action="store_true", help="persist to the strokes table")
+    ap.add_argument("--no-bst", action="store_true", help="geometry classifier only")
     args = ap.parse_args()
     train = args.train_match or OTHER.get(args.match_id, args.match_id)
-    res = evaluate(args.match_id, train)
+    res = evaluate(args.match_id, train, use_bst=not args.no_bst)
     if args.write:
         n = write_strokes(args.match_id, res["df"])
         print(f"wrote {n} source='pipeline' rows")
