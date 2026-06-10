@@ -22,13 +22,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
-from badminton import analytics, clip, commentary, config, court, db, insights, tactics, viz
+from badminton import analytics, clip, commentary, config, court, db, hits, insights, tactics, viz
 
 # Dev convenience: Streamlit hot-reloads only app.py, not imported submodules — so edits
 # to badminton/*.py would otherwise be ignored until a full server restart. Reload them
 # (leaf deps first) on every rerun so changes are picked up live.
 import importlib
-for _mod in (config, court, db, viz, analytics, clip, tactics, insights, commentary):
+for _mod in (config, court, db, viz, analytics, clip, tactics, insights, commentary, hits):
     importlib.reload(_mod)
 
 SS_OFFSET = 6
@@ -130,6 +130,47 @@ def get_recs(mid):
                          hit_px=(r["hit_x"], r["hit_y"]) if pd.notna(r["hit_x"]) else None,
                          land_px=(r["landing_x"], r["landing_y"]) if pd.notna(r["landing_x"]) else None))
     return recs
+
+
+@st.cache_data(show_spinner=False)
+def shuttle_counts(mid):
+    con = db.connect(read_only=True)
+    n, vis = con.execute(
+        "SELECT COUNT(*), COALESCE(SUM(CASE WHEN visible THEN 1 ELSE 0 END), 0) "
+        "FROM shuttle WHERE match_id=?", [mid]).fetchone()
+    con.close()
+    return int(n), int(vis)
+
+
+@st.cache_data(show_spinner="Scoring hit detection vs labels… (~1 min, cached)")
+def get_hit_validation(mid):
+    return hits.validate(mid, verbose=False)
+
+
+@st.cache_data(show_spinner="Computing CV landing points…")
+def get_cv_landings(mid):
+    """Predicted vs labeled landing (court m) for floor-ending rallies."""
+    sdf_, rdf_ = get_sdf(mid), get_rdf(mid)
+    H = np.array(config.get_match(mid)["homography"], np.float32).reshape(3, 3)
+    out = []
+    for (sn, rid), g in sdf_.groupby(["set_no", "rally_id"]):
+        rrow = rdf_[(rdf_["set_no"] == sn) & (rdf_["rally_id"] == rid)]
+        if not len(rrow) or rrow.iloc[0]["category"] not in ("Winner", "Out"):
+            continue
+        end = g.sort_values("ball_round").iloc[-1]
+        if pd.isna(end["landing_x"]):
+            continue
+        land = hits.find_landing(mid, int(end["frame_num"]) - 1)
+        if land is None:
+            continue
+        lab = court.image_to_court(
+            np.array([[end["landing_x"], end["landing_y"]]], np.float32), H)[0]
+        out.append(dict(set_no=int(sn), rally_id=int(rid),
+                        px=land["court_x"], py=land["court_y"],
+                        lx=float(lab[0]), ly=float(lab[1]),
+                        err=float(np.hypot(land["court_x"] - lab[0],
+                                           land["court_y"] - lab[1]))))
+    return out
 
 
 # ------------------------------------------------------------------ helpers
@@ -616,6 +657,31 @@ def rally_diagram(sn, rid, f0, f1):
         if int(s["ball_round"]) == last_br and pd.notna(s["land_mx"]):
             ax.scatter([s["land_mx"]], [s["land_my"]], s=130, marker="*", c="#ffd43b",
                        edgecolors="black", linewidths=.5, zorder=7)
+
+    # CV layer (label-free pipeline): ring = detected hit at the tracked hitter
+    # position; green ✕ = CV landing. Should shadow the labeled dots/star.
+    if shuttle_counts(MATCH)[0]:
+        lab_f = (g["frame_num"].astype(int) - 1)
+        f0v, f1v = int(lab_f.min() - 20), int(lab_f.max() + 20)
+        dh = hits.detect_hits(MATCH, f0v, f1v)
+        hits.attribute_hits(MATCH, dh)
+        if dh:
+            con = db.connect(read_only=True)
+            for h in dh:
+                if h.get("player") is None:
+                    continue
+                row = con.execute(
+                    "SELECT court_x, court_y FROM tracks WHERE match_id=? AND "
+                    "player_id=? AND frame_num BETWEEN ? AND ? LIMIT 1",
+                    [MATCH, h["player"], h["frame"] - 2, h["frame"] + 2]).fetchone()
+                if row:
+                    ax.scatter([row[0]], [row[1]], s=86, facecolors="none",
+                               edgecolors="#69db7c", linewidths=1.1, zorder=8)
+            con.close()
+            land = hits.find_landing(MATCH, dh[-1]["frame"])
+            if land is not None:
+                ax.scatter([land["court_x"]], [land["court_y"]], s=90, marker="x",
+                           c="#69db7c", linewidths=1.4, zorder=8)
     return fig
 
 
@@ -709,8 +775,9 @@ def page_film():
     st.divider()
     d1, d2 = st.columns([1, 2])
     with d1:
-        st.caption("Rally map — numbered contact points, ★ final landing, "
-                   "faint lines = player movement")
+        st.caption("Rally map — numbered contact points, ★ final landing, faint "
+                   "lines = player movement. Green = the label-free CV pipeline: "
+                   "○ detected hit (at the tracked hitter), ✕ detected landing.")
         fig = rally_diagram(int(r["set_no"]), int(r["rally_id"]), int(r["f0"]), int(r["f1"]))
         st.pyplot(fig)
         plt.close(fig)
@@ -746,8 +813,98 @@ def page_lab():
     tracks = get_tracks(MATCH)
     errs = np.array([r["err"] for r in recs if r["err"] is not None])
 
-    tab_val, tab_stroke, tab_map, tab_video = st.tabs(
-        ["📊 Validation", "🔎 Stroke browser", "🗺️ Raw position maps", "🎬 Full video"])
+    tab_val, tab_shuttle, tab_stroke, tab_map, tab_video = st.tabs(
+        ["📊 Validation", "🪶 Shuttle", "🔎 Stroke browser", "🗺️ Raw position maps",
+         "🎬 Full video"])
+
+    with tab_shuttle:
+        n_sh, vis_sh = shuttle_counts(MATCH)
+        if n_sh == 0:
+            st.info(f"No shuttle track for this match yet — run "
+                    f"`PYTHONPATH=src python -m badminton.shuttle {MATCH}` "
+                    "(TrackNetV3, several hours for a full match).")
+        else:
+            st.caption(f"TrackNetV3 track: **{n_sh:,} frames**, {100 * vis_sh / n_sh:.1f}% "
+                       "with a visible shuttle (includes non-rally broadcast footage). "
+                       "Hits = |Δv| ∪ direction-turn detectors on the track; "
+                       "alignment: contact = label frame − 1.")
+            v = get_hit_validation(MATCH)
+            c = st.columns(6)
+            c[0].metric("Hit F1", f"{v['f1']:.1%}")
+            c[1].metric("Precision", f"{v['precision']:.1%}")
+            c[2].metric("Recall", f"{v['recall']:.1%}")
+            c[3].metric("Attribution", f"{v['attribution_acc']:.1%}"
+                        if v["attribution_acc"] else "—")
+            c[4].metric("Landing med (m)", f"{v['landing_median_m']}"
+                        if v["landing_median_m"] is not None else "—")
+            c[5].metric("Landing p90 (m)", f"{v['landing_p90_m']}"
+                        if v["landing_p90_m"] is not None else "—")
+            st.caption(f"vs {v['n_label']} labeled strokes (±6 frames) · "
+                       f"{v['n_landing']} floor landings scored")
+            st.divider()
+
+            left, right = st.columns([3, 2])
+            with left:
+                st.markdown("**Rally trajectory explorer** — shuttle screen position "
+                            "vs time; green = detected hit, dashed gray = label")
+                opts = list(zip(rdf["set_no"], rdf["rally_id"]))
+                sel = st.selectbox("Rally", opts,
+                                   format_func=lambda t: f"Set {t[0]} · Rally {t[1]}",
+                                   label_visibility="collapsed")
+                gg = sdf[(sdf["set_no"] == sel[0])
+                         & (sdf["rally_id"] == sel[1])].sort_values("ball_round")
+                lab_f = (gg["frame_num"].astype(int) - 1)
+                f0s, f1s = int(lab_f.min() - 20), int(lab_f.max() + 20)
+                ss = hits.shuttle_series(MATCH, f0s, f1s, interpolate=False)
+                mm = (ss.reset_index()
+                        .melt("frame_num", ["img_x", "img_y"],
+                              var_name="coord", value_name="px"))
+                dh = hits.detect_hits(MATCH, f0s, f1s)
+                hits.attribute_hits(MATCH, dh)
+                side2p = {SMAP.get((sel[0], p)): p for p in ("A", "B")}
+                det = pd.DataFrame([{
+                    "frame_num": h["frame"],
+                    "Hitter": NAME.get(side2p.get(h.get("player")), "?"),
+                    "score": round(h["score"], 1)} for h in dh])
+                layers = [alt.Chart(mm).mark_line(interpolate="monotone").encode(
+                    x=alt.X("frame_num:Q", title="video frame",
+                            scale=alt.Scale(domain=[f0s, f1s])),
+                    y=alt.Y("px:Q", title="screen px"),
+                    color=alt.Color("coord:N", scale=alt.Scale(
+                        domain=["img_x", "img_y"], range=["#74c0fc", "#ffa94d"]),
+                        legend=alt.Legend(orient="top", title=None)))]
+                if len(det):
+                    layers.append(alt.Chart(det).mark_rule(
+                        color=GREEN, strokeWidth=2, opacity=.8).encode(
+                        x="frame_num:Q",
+                        tooltip=["frame_num:Q", "Hitter:N", "score:Q"]))
+                layers.append(alt.Chart(pd.DataFrame({"frame_num": lab_f})).mark_rule(
+                    color="#adb5bd", strokeDash=[4, 3]).encode(x="frame_num:Q"))
+                st.altair_chart(alt.layer(*layers).properties(height=320),
+                                width="stretch")
+            with right:
+                st.markdown("**Landing accuracy** — ★ label vs ✕ CV, per floor-ending "
+                            "rally")
+                lands = get_cv_landings(MATCH)
+                if not lands:
+                    st.info("No floor-ending rallies with landings to score.")
+                else:
+                    fig, ax = small_court(figsize=(2.4, 4.4))
+                    for L in lands:
+                        ax.plot([L["lx"], L["px"]], [L["ly"], L["py"]],
+                                color="#fa5252", lw=.7, alpha=.6, zorder=4)
+                        ax.scatter([L["lx"]], [L["ly"]], s=42, marker="*",
+                                   c="#ffd43b", edgecolors="black", linewidths=.3,
+                                   zorder=5)
+                        ax.scatter([L["px"]], [L["py"]], s=26, marker="x",
+                                   c="#69db7c", linewidths=1.0, zorder=5)
+                    ax.set_xlim(-1.2, court.COURT_WIDTH_M + 1.2)
+                    ax.set_ylim(-1.2, court.COURT_LENGTH_M + 1.2)
+                    st.pyplot(fig)
+                    plt.close(fig)
+                    errs_l = np.array([L["err"] for L in lands])
+                    st.caption(f"n={len(lands)} · median {np.median(errs_l):.2f} m · "
+                               f"p90 {np.percentile(errs_l, 90):.2f} m")
 
     with tab_val:
         c1, c2, c3, c4 = st.columns(4)

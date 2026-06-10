@@ -38,7 +38,18 @@ def render(match_id: str, start: int, end: int, out_path: Path,
         "WHERE match_id=? AND source='shuttleset' AND hitter_x IS NOT NULL "
         "AND frame_num BETWEEN ? AND ?", [match_id, start - 30, end]).fetchall():
         ss[f + SS_OFFSET] = (hx, hy, st, raw)
+    shuttle: dict[int, tuple] = {}
+    for f, sx, sy in con.execute(
+        "SELECT frame_num,img_x,img_y FROM shuttle WHERE match_id=? AND visible "
+        "AND frame_num BETWEEN ? AND ?", [match_id, start - 15, end]).fetchall():
+        shuttle[f] = (sx, sy)
     con.close()
+
+    hit_events: dict[int, dict] = {}
+    if shuttle:
+        from . import hits as hits_mod
+        for h in hits_mod.detect_hits(match_id, start, end):
+            hit_events[h["frame"]] = h
 
     cap = cv2.VideoCapture(str(video))
     cap.set(cv2.CAP_PROP_POS_FRAMES, start)
@@ -63,6 +74,25 @@ def render(match_id: str, start: int, end: int, out_path: Path,
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, col, 2)
             viz.draw_point(mini, cx, cy, col, 6, pid)
 
+        # shuttle comet trail (fading) + current position + hit flashes
+        if shuttle:
+            TRAIL = 12
+            for g in range(fr - TRAIL, fr + 1):
+                if g not in shuttle:
+                    continue
+                fade = max(0.15, 1.0 - (fr - g) / TRAIL)
+                col = (int(90 * fade), int(255 * fade), int(255 * fade))   # BGR yellow
+                cv2.circle(frame, (int(shuttle[g][0]), int(shuttle[g][1])),
+                           max(2, int(6 * fade)), col, -1)
+            for hf, h in hit_events.items():
+                age = fr - hf
+                if 0 <= age <= 6:
+                    cv2.circle(frame, (int(h["x"]), int(h["y"])),
+                               12 + age * 4, (110, 255, 105), 2)
+                    if age <= 3:
+                        cv2.putText(frame, "HIT", (int(h["x"]) + 18, int(h["y"]) - 12),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (110, 255, 105), 2)
+
         if fr in ss:
             last_ss, ss_age = ss[fr], 0
         if last_ss is not None and ss_age <= ss_linger:
@@ -79,7 +109,8 @@ def render(match_id: str, start: int, end: int, out_path: Path,
         frame[y0:y0 + ch, x0:x0 + cw] = mini
         cv2.rectangle(frame, (x0 - 1, y0 - 1), (x0 + cw, y0 + ch), (255, 255, 255), 1)
         for i, (txt, col) in enumerate([("near", viz.NEAR_C), ("far", viz.FAR_C),
-                                        ("ShuttleSet", viz.SS_C)]):
+                                        ("ShuttleSet", viz.SS_C),
+                                        ("shuttle", (90, 255, 255))]):
             cv2.putText(frame, txt, (x0, y0 + ch + 16 + i * 18),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
         cv2.putText(frame, f"frame {fr}", (12, Hh - 14),
