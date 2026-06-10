@@ -42,9 +42,10 @@ def build_strokes(match_id: str) -> pd.DataFrame:
     H = np.array(config.get_match(match_id)["homography"], np.float32).reshape(3, 3)
     con = db.connect(read_only=True)
 
+    off = hits.shuttle_offset(match_id)
     rows = []
     for (sn, rid), g in sdf.groupby(["set_no", "rally_id"]):
-        lab_f = (g["frame_num"].astype(int) - 1)
+        lab_f = (g["frame_num"].astype(int) + off)
         f0, f1 = int(lab_f.min() - 20), int(lab_f.max() + 20)
         dh = hits.detect_hits(match_id, f0, f1)
         hits.attribute_hits(match_id, dh)
@@ -149,13 +150,14 @@ def evaluate(match_id: str, train_match: str, verbose: bool = True) -> dict:
     sdf = insights.stroke_df(match_id)
     smap = insights.side_map_from(sdf)
 
+    off = hits.shuttle_offset(match_id)
     n_match = hit_ok = shot_ok = shot_n = 0
     for (sn, rid), g in sdf.groupby(["set_no", "rally_id"]):
         ours = df[(df["set_no"] == sn) & (df["rally_id"] == rid)]
         used = np.zeros(len(ours), bool)
         of = ours["frame_num"].to_numpy()
         for _, lab in g.iterrows():
-            lf = int(lab["frame_num"]) - 1
+            lf = int(lab["frame_num"]) + off
             cands = [(abs(int(of[j]) - lf), j) for j in range(len(ours))
                      if not used[j] and abs(int(of[j]) - lf) <= 6]
             if not cands:

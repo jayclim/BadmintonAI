@@ -134,10 +134,11 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
    jump in `nav_jump` and apply it at the TOP of the next run, before the nav radio exists.
 9. **The +6 frame offset is NOT right for the shuttle.** Phase 0's `+6` was fit on player
    feet, whose error curve is flat over ±10 frames. The shuttle moves 20+ px/frame and
-   pins the true contact sharply: TrackNetV3-vs-label offset sweep has its minimum at
-   **SS frame − 1** (video frames), full-match (980 strokes): 99.8% detected, median
-   115.5 px, p90 339 px. Use −1 for shuttle/hit-event alignment; keep +6 for the
-   (insensitive) player tracks. The ~115 px residual is the same scale as ShuttleSet's
+   pins the true contact sharply — AND it's **per match**: the offset-sweep minimum is
+   −1 for india_open (median 115.5 px, 99.8% detected, 980 strokes) but **−3 for
+   denmark_open** (85.2 px, 586 strokes). Stored as `ss_shuttle_offset` in
+   `config/matches.yaml`; always go through `hits.shuttle_offset(match_id)`. Keep +6
+   for the (insensitive) player tracks. The ~115 px residual is the same scale as ShuttleSet's
    once-per-stroke click noise (~100 px ≈ Phase 0's 0.566 m); visually TrackNet is dead-on
    (~15–20 px) for normal shots and the p90 tail is smash motion-blur. Also: serves
    (ball_round 1) have EMPTY hit_x/hit_y, and stroke N's hit point ≈ stroke N−1's landing.
@@ -177,10 +178,13 @@ a friendly setup notice instead of a crash).
   sliding-window ensemble; `--eval-mode nonoverlap` is ~8× faster if a match needs a quick
   pass). Geometry shot baseline done (`shotclass.py`, 84–88% cross-match). Hit detection
   + landings DONE (`hits.py`: F1 87.9, attribution 90%, landings 0.548 m median — see
-  module map). Next: (a) re-validate `hits.py` on denmark_open_2022_sf once its shuttle
-  run lands (thresholds were tuned on India Open — that's the honest held-out test);
-  (b) wire detected hits into `strokes` source='pipeline' rows (serve-onset rally
-  segmentation + hits + landings = label-free Tier-1); (c) BST adapter —
+  module map). **HELD-OUT TEST PASSED (denmark, all thresholds untouched, 2026-06-10):**
+  hits P 90.2 / R 81.7 / F1 85.8 (india: 87.9), attribution 94.5%, landings median
+  1.12 m; **BST 82.8% shot class / 82.0% end-to-end (india: 71.8/69.6)** — no overfit,
+  and BST beats geometry-on-CV by ~15–26 pts on both matches. Next: (a) swap BST into
+  `pipeline.py` at DETECTED hit frames (predict_df is the interface); (b) rally
+  segmentation (serve-onset + visibility runs + replay rejection) to drop the last
+  label dependency; (c) BST adapter —
   `third_party/BST` cloned, pretrained ShuttleSet weights + preprocessed eval npy on its
   README Drive links; inputs (17 COCO joints bbox-normalized, court-normalized positions,
   shuttle xy) all exist in our `tracks`/`shuttle` tables. CPU/MPS-friendly (plain PyTorch).

@@ -53,8 +53,10 @@ def _normalize_joints(j: np.ndarray, bb: np.ndarray) -> np.ndarray:
 
 def build_inputs(match_id: str):
     """(JnB, shuttle, video_len, labels) for every labeled stroke with a known class."""
+    from . import hits
     sdf = insights.stroke_df(match_id)
     smap = insights.side_map_from(sdf)
+    off = hits.shuttle_offset(match_id)
     con = db.connect(read_only=True)
 
     JnBs, shuttles, labels, ids = [], [], [], []
@@ -64,7 +66,7 @@ def build_inputs(match_id: str):
         if en is None or side is None:
             continue
         ids.append((int(s["set_no"]), int(s["rally_id"]), int(s["ball_round"])))
-        c = int(s["frame_num"]) - 1
+        c = int(s["frame_num"]) + off
         f0, f1 = c - HALF, c + HALF
 
         joints = np.zeros((f1 - f0 + 1, 2, 17, 2), np.float32)

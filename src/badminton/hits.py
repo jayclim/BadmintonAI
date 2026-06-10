@@ -27,8 +27,14 @@ import pandas as pd
 
 from . import config, court, db, insights
 
-SHUTTLE_OFFSET = -1     # video frame = SS frame + SHUTTLE_OFFSET (shuttle events)
+SHUTTLE_OFFSET = -1     # default: video frame = SS frame + offset (shuttle events).
+                        # PER MATCH — set ss_shuttle_offset in matches.yaml
+                        # (india −1, denmark −3); use shuttle_offset(match_id).
 TRACK_OFFSET = 6        # video frame = SS frame + TRACK_OFFSET (player tracks)
+
+
+def shuttle_offset(match_id: str) -> int:
+    return int(config.get_match(match_id).get("ss_shuttle_offset", SHUTTLE_OFFSET))
 DELTA = 4               # velocity estimation half-window (frames)
 MIN_SPEED = 3.0         # px/frame — sustained-motion gate for the serve detector
 MIN_DV = 30.0           # |Δv| px/frame threshold: velocity CHANGE at contact catches
@@ -232,11 +238,12 @@ def validate(match_id: str, tol: int = 6, verbose: bool = True,
     m = config.get_match(match_id)
     H = np.array(m["homography"], dtype=np.float32).reshape(3, 3)
 
+    off = shuttle_offset(match_id)
     tp = fp = fn = attr_ok = attr_n = 0
     land_errs = []
     for (sn, rid), g in sdf.groupby(["set_no", "rally_id"]):
         g = g.sort_values("ball_round")
-        lab_frames = (g["frame_num"] + SHUTTLE_OFFSET).to_numpy()
+        lab_frames = (g["frame_num"] + off).to_numpy()
         f0, f1 = int(lab_frames.min() - 20), int(lab_frames.max() + 20)
         hits = detect_hits(match_id, f0, f1, min_dv=min_dv)
         attribute_hits(match_id, hits)

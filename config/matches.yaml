@@ -32,6 +32,7 @@ india_open_2022_final:
   - -1.3805945470273173e-05
   - 0.0037453302283051394
   - 1.0
+  ss_shuttle_offset: -1
 denmark_open_2022_sf:
   match_id: denmark_open_2022_sf
   discipline: singles
@@ -66,3 +67,4 @@ denmark_open_2022_sf:
   - 1.181880206809228e-06
   - 0.004307835473704193
   - 1.0
+  ss_shuttle_offset: -3

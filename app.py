@@ -166,7 +166,7 @@ def get_cv_landings(mid):
         end = g.sort_values("ball_round").iloc[-1]
         if pd.isna(end["landing_x"]):
             continue
-        land = hits.find_landing(mid, int(end["frame_num"]) - 1)
+        land = hits.find_landing(mid, int(end["frame_num"]) + hits.shuttle_offset(mid))
         if land is None:
             continue
         lab = court.image_to_court(
@@ -667,7 +667,7 @@ def rally_diagram(sn, rid, f0, f1):
     # CV layer (label-free pipeline): ring = detected hit at the tracked hitter
     # position; green ✕ = CV landing. Should shadow the labeled dots/star.
     if shuttle_counts(MATCH)[0]:
-        lab_f = (g["frame_num"].astype(int) - 1)
+        lab_f = (g["frame_num"].astype(int) + hits.shuttle_offset(MATCH))
         f0v, f1v = int(lab_f.min() - 20), int(lab_f.max() + 20)
         dh = hits.detect_hits(MATCH, f0v, f1v)
         hits.attribute_hits(MATCH, dh)
@@ -921,7 +921,7 @@ def page_lab():
                                    label_visibility="collapsed")
                 gg = sdf[(sdf["set_no"] == sel[0])
                          & (sdf["rally_id"] == sel[1])].sort_values("ball_round")
-                lab_f = (gg["frame_num"].astype(int) - 1)
+                lab_f = (gg["frame_num"].astype(int) + hits.shuttle_offset(MATCH))
                 f0s, f1s = int(lab_f.min() - 20), int(lab_f.max() + 20)
                 ss = hits.shuttle_series(MATCH, f0s, f1s, interpolate=False)
                 mm = (ss.reset_index()
