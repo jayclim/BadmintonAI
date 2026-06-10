@@ -57,12 +57,13 @@ def build_inputs(match_id: str):
     smap = insights.side_map_from(sdf)
     con = db.connect(read_only=True)
 
-    JnBs, shuttles, labels = [], [], []
+    JnBs, shuttles, labels, ids = [], [], [], []
     for _, s in sdf.iterrows():
         en = s["shot"] if s["shot"] in shuttleset._CN_EN.values() else None
         side = smap.get((int(s["set_no"]), s["hitter"]))   # 'near' | 'far'
         if en is None or side is None:
             continue
+        ids.append((int(s["set_no"]), int(s["rally_id"]), int(s["ball_round"])))
         c = int(s["frame_num"]) - 1
         f0, f1 = c - HALF, c + HALF
 
@@ -98,11 +99,14 @@ def build_inputs(match_id: str):
         labels.append(("Top_" if side == "far" else "Bottom_", en))
     con.close()
     return (np.stack(JnBs).astype(np.float32),
-            np.stack(shuttles).astype(np.float32), labels)
+            np.stack(shuttles).astype(np.float32), labels, ids)
 
 
-def evaluate(match_id: str, batch: int = 256) -> dict:
-    JnB, sh, labels = build_inputs(match_id)
+def predict_df(match_id: str, batch: int = 256):
+    """Per-stroke BST predictions joined to labels (one row per labeled stroke)."""
+    import pandas as pd
+
+    JnB, sh, labels, ids = build_inputs(match_id)
     net = BST_0(in_dim=(17 + len(PAIRS)) * 2, n_class=len(CLASSES),
                 seq_len=SEQ_LEN, depth_tem=2, depth_inter=1)
     net.load_state_dict(torch.load(WEIGHTS, map_location="cpu", weights_only=False))
@@ -118,18 +122,29 @@ def evaluate(match_id: str, batch: int = 256) -> dict:
             preds.append(net(x, s, vl).argmax(1))
     preds = torch.cat(preds).numpy()
 
-    side_ok = cls_ok = joint_ok = known = 0
-    for p, (side, en) in zip(preds, labels):
+    rows = []
+    for p, (side, en), (sn, rid, br) in zip(preds, labels, ids):
         name = CLASSES[p]
-        if name == "未知球種":
-            continue
-        known += 1
-        p_side = "Top_" if name.startswith("Top_") else "Bottom_"
-        p_en = shuttleset.canonical_shot_type(name.split("_", 1)[1])
-        side_ok += p_side == side
-        cls_ok += p_en == en
-        joint_ok += (p_side == side) and (p_en == en)
-    n = len(labels)
+        unknown = name == "未知球種"
+        rows.append(dict(
+            set_no=sn, rally_id=rid, ball_round=br,
+            label_side=side, label_shot=en,
+            pred_side=None if unknown else
+            ("Top_" if name.startswith("Top_") else "Bottom_"),
+            pred_shot=None if unknown else
+            shuttleset.canonical_shot_type(name.split("_", 1)[1])))
+    return pd.DataFrame(rows)
+
+
+def evaluate(match_id: str, batch: int = 256) -> dict:
+    df = predict_df(match_id, batch=batch)
+    known_df = df[df["pred_shot"].notna()]
+    known = len(known_df)
+    side_ok = int((known_df["pred_side"] == known_df["label_side"]).sum())
+    cls_ok = int((known_df["pred_shot"] == known_df["label_shot"]).sum())
+    joint_ok = int(((known_df["pred_side"] == known_df["label_side"])
+                    & (known_df["pred_shot"] == known_df["label_shot"])).sum())
+    n = len(df)
     out = dict(n=n, predicted_known=known,
                side_acc=round(side_ok / known, 4) if known else None,
                class_acc=round(cls_ok / known, 4) if known else None,

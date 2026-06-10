@@ -147,6 +147,12 @@ def get_hit_validation(mid):
     return hits.validate(mid, verbose=False)
 
 
+@st.cache_data(show_spinner="Running BST-0 on every stroke… (~2 min, cached)")
+def get_bst_preds(mid):
+    from badminton import bst_eval   # lazy: pulls in torch + third_party/BST
+    return bst_eval.predict_df(mid)
+
+
 @st.cache_data(show_spinner="Computing CV landing points…")
 def get_cv_landings(mid):
     """Predicted vs labeled landing (court m) for floor-ending rallies."""
@@ -813,9 +819,71 @@ def page_lab():
     tracks = get_tracks(MATCH)
     errs = np.array([r["err"] for r in recs if r["err"] is not None])
 
-    tab_val, tab_shuttle, tab_stroke, tab_map, tab_video = st.tabs(
-        ["📊 Validation", "🪶 Shuttle", "🔎 Stroke browser", "🗺️ Raw position maps",
-         "🎬 Full video"])
+    tab_val, tab_shuttle, tab_shot, tab_stroke, tab_map, tab_video = st.tabs(
+        ["📊 Validation", "🪶 Shuttle", "🎯 Shot classes", "🔎 Stroke browser",
+         "🗺️ Raw position maps", "🎬 Full video"])
+
+    with tab_shot:
+        bst_w = config.REPO_ROOT / "third_party" / "BST" / "bst_weights" / \
+            "bst_0_JnB_bone_merged.pt"
+        n_sh2, _ = shuttle_counts(MATCH)
+        if not bst_w.exists() or n_sh2 == 0:
+            st.info("Needs the BST weights (`third_party/BST/bst_weights/`) and a "
+                    "shuttle track for this match — see HANDOFF §Phase 2.")
+        else:
+            st.caption("Pretrained **BST-0** (CVPRW'26) running on OUR CV inputs "
+                       "(YOLO pose + TrackNetV3 shuttle, ±0.5 s window at each labeled "
+                       "contact), zero fine-tuning. Baselines: geometry classifier = "
+                       "84–88% on label features, 56.6% on CV features.")
+            bdf = get_bst_preds(MATCH)
+            known = bdf[bdf["pred_shot"].notna()]
+            c = st.columns(4)
+            c[0].metric("Shot class", f"{(known['pred_shot'] == known['label_shot']).mean():.1%}")
+            c[1].metric("Hitter side", f"{(known['pred_side'] == known['label_side']).mean():.1%}")
+            c[2].metric("End-to-end", f"{(bdf['pred_shot'] == bdf['label_shot']).mean():.1%}")
+            c[3].metric("Strokes", f"{len(known)}/{len(bdf)}")
+            st.divider()
+
+            left, right = st.columns([3, 2])
+            with left:
+                st.markdown("**Confusion matrix** — rows = label, columns = BST "
+                            "prediction, color = share of the row")
+                cm = (known.groupby(["label_shot", "pred_shot"]).size()
+                      .rename("n").reset_index())
+                cm["row_pct"] = cm["n"] / cm.groupby("label_shot")["n"].transform("sum")
+                order = [s for s in insights.SHOT_ORDER
+                         if s in set(cm["label_shot"]) | set(cm["pred_shot"])]
+                ch = alt.Chart(cm).mark_rect().encode(
+                    y=alt.Y("label_shot:N", sort=order, title="label"),
+                    x=alt.X("pred_shot:N", sort=order, title="BST prediction",
+                            axis=alt.Axis(labelAngle=-40)),
+                    color=alt.Color("row_pct:Q", scale=alt.Scale(scheme="tealblues"),
+                                    legend=None),
+                    tooltip=["label_shot:N", "pred_shot:N", "n:Q",
+                             alt.Tooltip("row_pct:Q", format=".0%")],
+                ).properties(height=340)
+                txt = alt.Chart(cm[cm["n"] >= 3]).mark_text(fontSize=10).encode(
+                    y=alt.Y("label_shot:N", sort=order),
+                    x=alt.X("pred_shot:N", sort=order),
+                    text="n:Q",
+                    color=alt.condition(alt.datum.row_pct > 0.5,
+                                        alt.value("white"), alt.value("#cbd5e1")))
+                st.altair_chart(ch + txt, width="stretch")
+            with right:
+                st.markdown("**Per-class recall** — how often each labeled shot "
+                            "type is recognized")
+                rec = (known.assign(ok=known["pred_shot"] == known["label_shot"])
+                       .groupby("label_shot")
+                       .agg(recall=("ok", "mean"), n=("ok", "size")).reset_index())
+                ch = alt.Chart(rec).mark_bar(height=14, color="#5c7cfa").encode(
+                    y=alt.Y("label_shot:N", sort="-x", title=None,
+                            axis=alt.Axis(labelLimit=140)),
+                    x=alt.X("recall:Q", title="recall",
+                            scale=alt.Scale(domain=[0, 1]),
+                            axis=alt.Axis(format=".0%")),
+                    tooltip=["label_shot:N", alt.Tooltip("recall:Q", format=".0%"),
+                             "n:Q"]).properties(height=alt.Step(30))
+                st.altair_chart(ch, width="stretch")
 
     with tab_shuttle:
         n_sh, vis_sh = shuttle_counts(MATCH)
