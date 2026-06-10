@@ -477,9 +477,9 @@ def page_maps():
             st.pyplot(fig)
             plt.close(fig)
             c = st.columns(3)
-            c[0].metric("Distance", f"{mt['distance_m']:,} m")
-            c[1].metric("Avg speed", f"{mt['mean_speed']} m/s")
-            c[2].metric("Recovery", f"{mt['recovery_m']} m")
+            c[0].metric("Distance (m)", f"{mt['distance_m']:,}")
+            c[1].metric("Speed (m/s)", f"{mt['mean_speed']}")
+            c[2].metric("Recovery (m)", f"{mt['recovery_m']}")
     with cols[2]:
         st.markdown("**Court-zone time**")
         zone_rows = []
@@ -546,13 +546,14 @@ def page_patterns():
         ep = insights.error_pressure(MATCH, rdf)
         d = pd.DataFrame([{"Player": NAME[p], "kind": k, "n": ep[p][k]}
                           for p in ("B", "A") for k in ("forced", "unforced")])
-        ch = alt.Chart(d).mark_bar().encode(
-            y=alt.Y("Player:N", title=None),
+        ch = alt.Chart(d).mark_bar(height=26).encode(
+            y=alt.Y("Player:N", title=None,
+                    axis=alt.Axis(labelLimit=160, labelFontSize=13)),
             x=alt.X("n:Q", title="rally-ending errors"),
             color=alt.Color("kind:N", scale=alt.Scale(domain=["forced", "unforced"],
                                                       range=["#f59f00", RED]),
                             legend=alt.Legend(orient="top", title=None)),
-            tooltip=["Player:N", "kind:N", "n:Q"]).properties(height=140)
+            tooltip=["Player:N", "kind:N", "n:Q"]).properties(height=alt.Step(44))
         st.altair_chart(ch, width="stretch")
     with c2:
         st.markdown("#### Backhand vulnerability")
@@ -563,24 +564,30 @@ def page_patterns():
                           for p in ("B", "A")
                           for k, lab in [("usage_pct", "of all shots"),
                                          ("err_pct", "of own errors")]])
-        ch = alt.Chart(d).mark_bar().encode(
-            y=alt.Y("Player:N", title=None), yOffset="metric:N",
+        ch = alt.Chart(d).mark_bar(height=18).encode(
+            y=alt.Y("Player:N", title=None,
+                    axis=alt.Axis(labelLimit=160, labelFontSize=13)),
+            yOffset="metric:N",
             x=alt.X("pct:Q", title="backhand %", scale=alt.Scale(domain=[0, 100])),
             color=alt.Color("metric:N", scale=alt.Scale(range=["#868e96", RED]),
                             legend=alt.Legend(orient="top", title=None)),
-            tooltip=["Player:N", "metric:N", "pct:Q"]).properties(height=160)
+            tooltip=["Player:N", "metric:N", "pct:Q"]).properties(height=alt.Step(52))
         st.altair_chart(ch, width="stretch")
     with c3:
         st.markdown("#### Shot mix")
         st.caption("How each player constructs rallies — share of all shots hit.")
-        d = (sdf.groupby(["hitter", "shot"]).size().rename("n").reset_index())
+        d = (sdf[sdf["shot"].isin(insights.SHOT_ORDER)]    # drop unmapped raw classes
+             .groupby(["hitter", "shot"]).size().rename("n").reset_index())
         d["pct"] = d.groupby("hitter")["n"].transform(lambda s: 100 * s / s.sum()).round(1)
         d["Player"] = d["hitter"].map(NAME)
-        ch = alt.Chart(d[d["hitter"].isin(["A", "B"])]).mark_bar().encode(
-            y=alt.Y("shot:N", sort="-x", title=None), yOffset="Player:N",
+        ch = alt.Chart(d[d["hitter"].isin(["A", "B"])]).mark_bar(height=9).encode(
+            y=alt.Y("shot:N", sort="-x", title=None,
+                    axis=alt.Axis(labelLimit=130)),
+            yOffset="Player:N",
             x=alt.X("pct:Q", title="% of own shots"),
-            color=alt.Color("Player:N", scale=player_scale(), legend=None),
-            tooltip=["Player:N", "shot:N", "pct:Q", "n:Q"]).properties(height=300)
+            color=alt.Color("Player:N", scale=player_scale(),
+                            legend=alt.Legend(orient="top", title=None)),
+            tooltip=["Player:N", "shot:N", "pct:Q", "n:Q"]).properties(height=alt.Step(26))
         st.altair_chart(ch, width="stretch")
 
 
@@ -657,16 +664,24 @@ def page_film():
 
     disp = pd.DataFrame({
         "Set": f["set_no"], "Rally": f["rally_id"],
-        "Score": f["score_a"].astype(str) + "–" + f["score_b"].astype(str),
+        "Score": f["score_a"].astype(str) + "–" + f["score_b"].astype(str)
+        + np.where(f["clutch"], " 🧊", ""),
         "Point to": f["winner"].map(NAME).fillna("—"),
         "Shots": f["shots"], "Sec": f["duration_s"],
-        "How it ended": f.apply(end_phrase, axis=1),
-        "Clutch": np.where(f["clutch"], "🧊", "")})
+        "How it ended": f.apply(end_phrase, axis=1)})
     left, right = st.columns([2, 3])
     with left:
         st.caption(f"{len(f)} rallies — click one to watch  · score is "
-                   f"**{SHORT['A']}–{SHORT['B']}** after the rally")
-        ev = st.dataframe(disp, hide_index=True, width="stretch", height=430,
+                   f"**{SHORT['A']}–{SHORT['B']}** after the rally · 🧊 = clutch")
+        ev = st.dataframe(disp, hide_index=True, width="stretch",
+                          height=min(430, 38 + 35 * len(disp)),
+                          column_config={
+                              "Set": st.column_config.NumberColumn(width="small"),
+                              "Rally": st.column_config.NumberColumn(width="small"),
+                              "Shots": st.column_config.NumberColumn(width="small"),
+                              "Sec": st.column_config.NumberColumn(width="small"),
+                              "How it ended": st.column_config.TextColumn(width="large"),
+                          },
                           on_select="rerun", selection_mode="single-row", key="fr_table")
         rows = ev.selection.rows if ev.selection else []
         r = f.iloc[rows[0] if rows else 0]
@@ -705,17 +720,21 @@ def page_film():
         det = tactics.rally_detail(MATCH, int(r["set_no"]), int(r["rally_id"]))
         dd = pd.DataFrame(det)
         dd["Player"] = dd["hitter"].map(NAME)
-        ch = alt.Chart(dd[dd["pressure_mps"].notna()]).mark_bar().encode(
-            x=alt.X("shot:O", title="shot #"),
+        ch = alt.Chart(dd[dd["pressure_mps"].notna()]).mark_bar(width=alt.RelativeBandSize(0.6)).encode(
+            x=alt.X("shot:O", title="shot #", axis=alt.Axis(labelAngle=0),
+                    scale=alt.Scale(domain=dd["shot"].tolist())),
             y=alt.Y("pressure_mps:Q", title="required speed (m/s)"),
             color=alt.Color("Player:N", scale=player_scale(),
                             legend=alt.Legend(orient="top", title=None)),
             tooltip=["shot:O", "Player:N", "type:N", "pressure_mps:Q"]).properties(height=170)
         st.altair_chart(ch, width="stretch")
-        show = dd[["shot", "Player", "type", "pressure_mps", "low_contact"]].rename(
-            columns={"shot": "#", "type": "Shot", "pressure_mps": "Pressure (m/s)",
-                     "low_contact": "Low contact"})
-        st.dataframe(show, hide_index=True, width="stretch", height=200)
+        show = pd.DataFrame({
+            "#": dd["shot"], "Player": dd["Player"], "Shot": dd["type"],
+            "Pressure (m/s)": dd["pressure_mps"].map(
+                lambda v: "—" if pd.isna(v) else f"{v:.1f}"),
+            "Low contact": np.where(dd["low_contact"], "✓", "")})
+        st.dataframe(show, hide_index=True, width="stretch",
+                     height=min(430, 38 + 35 * len(show)))
 
 
 # ================================================================== 🔬 Lab
