@@ -131,11 +131,13 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
    jump in `nav_jump` and apply it at the TOP of the next run, before the nav radio exists.
 9. **The +6 frame offset is NOT right for the shuttle.** Phase 0's `+6` was fit on player
    feet, whose error curve is flat over ±10 frames. The shuttle moves 20+ px/frame and
-   pins the true contact sharply: TrackNetV3-vs-label best offset peaks at **SS frame − 1**
-   (video frames) on the India Open match. Use −1 for shuttle/hit-event alignment; keep +6
-   for the (insensitive) player tracks. Residual ~90 px median at contact is largely
-   ShuttleSet click noise + motion-blur lag on smashes — verified visually (zoom crops
-   show TrackNet within ~15 px of the real shuttle).
+   pins the true contact sharply: TrackNetV3-vs-label offset sweep has its minimum at
+   **SS frame − 1** (video frames), full-match (980 strokes): 99.8% detected, median
+   115.5 px, p90 339 px. Use −1 for shuttle/hit-event alignment; keep +6 for the
+   (insensitive) player tracks. The ~115 px residual is the same scale as ShuttleSet's
+   once-per-stroke click noise (~100 px ≈ Phase 0's 0.566 m); visually TrackNet is dead-on
+   (~15–20 px) for normal shots and the p90 tail is smash motion-blur. Also: serves
+   (ball_round 1) have EMPTY hit_x/hit_y, and stroke N's hit point ≈ stroke N−1's landing.
 10. **`ffmpeg -ss` second-based cuts are NOT frame-exact** for validation purposes — use
    `shuttle.cut_exact()` (cv2 seek by frame index) when frame numbers must line up.
 
@@ -165,16 +167,19 @@ It then appears in the dashboard's Match selector automatically (uncalibrated ma
 a friendly setup notice instead of a crash).
 
 ## 10. Suggested next steps
-- **Phase 2 IN PROGRESS (2026-06-10).** TrackNetV3 integrated (`shuttle.py`, validated
-  visually + vs labels on set-1 rally-1); full India-Open run was launched (~2 h, check
-  `data/shuttle_pred/india_open_2022_final/` for the CSV + `shuttle` table row count).
-  Geometry shot baseline done (`shotclass.py`, 84–88% cross-match). Next: (a) full-match
-  shuttle validation at offset −1 across all 1,063 strokes; (b) hit detection from
-  trajectory direction-reversal + nearest player; (c) landing = last descending arc →
-  floor crossing → homography; (d) BST adapter — `third_party/BST` is cloned, pretrained
-  ShuttleSet weights + preprocessed eval npy are on its README's Google Drive links;
-  inputs (17 COCO joints bbox-normalized, court-normalized positions, shuttle xy) all
-  exist in our `tracks`/`shuttle` tables. CPU/MPS-friendly (plain PyTorch).
+- **Phase 2 IN PROGRESS (2026-06-10).** TrackNetV3 integrated AND full India-Open match
+  tracked: 128,400 frames in `shuttle` table (79.4% visible — includes non-rally broadcast
+  footage), validated vs all 980 labeled hit points: **99.8% detected, median 115.5 px at
+  offset −1** (≈ label-noise floor; see gotcha 9). 3h50m wall on MPS (~12 fps with the
+  sliding-window ensemble; `--eval-mode nonoverlap` is ~8× faster if a match needs a quick
+  pass). Geometry shot baseline done (`shotclass.py`, 84–88% cross-match). Next:
+  (a) hit detection from trajectory direction-reversal + nearest player (also yields OUR
+  contact frames, removing the label-offset dependence); (b) landing = last descending
+  arc → floor crossing → homography, vs labeled landing_x/y; (c) BST adapter —
+  `third_party/BST` cloned, pretrained ShuttleSet weights + preprocessed eval npy on its
+  README Drive links; inputs (17 COCO joints bbox-normalized, court-normalized positions,
+  shuttle xy) all exist in our `tracks`/`shuttle` tables. CPU/MPS-friendly (plain PyTorch).
+  (d) run `python -m badminton.shuttle denmark_open_2022_sf` overnight for match 2.
 - **Tactical commentary layer: WORKING (2026-06-10).** `commentary.py` + the 🎙️ Commentary
   dashboard page, generated end-to-end with Gemini (free tier, key in `.env`) for both
   matches. Multi-provider: add `ANTHROPIC_API_KEY` to `.env` to enable the Claude option
