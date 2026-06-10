@@ -24,3 +24,5 @@ gdown                    # fetch TrackNetV3/BST checkpoints from Google Drive
 parse                    # TrackNetV3 dep
 pycocotools              # TrackNetV3 dep (via its test.py)
 scikit-learn             # geometry shot-class baseline (shotclass.py)
+positional-encodings     # BST dep (bst_eval.py via third_party/BST)
+torchinfo                # BST dep
