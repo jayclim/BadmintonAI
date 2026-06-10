@@ -12,6 +12,10 @@ data/db/
 data/clips/
 data/logs/
 data/commentary/
+data/shuttle_pred/
+
+# Vendored research repos (cloned by hand; see HANDOFF §Phase 2)
+third_party/
 *.duckdb
 *.mp4
 *.mkv

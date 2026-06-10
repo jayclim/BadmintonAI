@@ -88,6 +88,8 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 | `clip.py` | `list_rallies`, `clip_rally` (raw), `annotated_rally` (detect+render, skips detect if parsed), `reason_en` |
 | `render_overlay.py` | annotated overlay video (boxes + minimap + SS labels) |
 | `viz.py` | top-down court minimap (cv2) + `mpl_court` (matplotlib) |
+| `shuttle.py` | Phase 2: TrackNetV3 shuttle tracking → `shuttle` table. Runs the vendored `third_party/TrackNetV3` predict.py unmodified via runpy with `.cuda()`→MPS + `torch.load`→CPU monkeypatches. `--window F0 F1` = frame-accurate cv2 cut of the match video; full-match mode uses `--large_video`. ~12–18 fps on MPS. Setup: `git clone qaz812345/TrackNetV3 third_party/TrackNetV3` + `gdown 1CfzE87a0f6LhBp0kniSl1-89zaLCZ8cA` → unzip to its `ckpts/`. |
+| `shotclass.py` | Phase 2: geometry-only shot classifier (sklearn HistGB, NaN-native). CV-deployable features (normalized positions, landing, dt, derived speed/deltas): **87.8% / 84.0% cross-match, 87.2% pooled 5-fold** on the 10 canonical classes. Labeled contact-height adds only ~1 pt. Weak classes: drive, push/rush (pose needed — BST's job). |
 | `scripts/parse_match.py` | chunked/resumable full-match parse |
 | `app.py` | Streamlit dashboard (7 tabs) |
 
@@ -127,6 +129,15 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 8. **Streamlit widget-key writes:** you cannot set `st.session_state[key]` for a widget
    already instantiated this run. The dashboard's insight→Film-room deep links stage the
    jump in `nav_jump` and apply it at the TOP of the next run, before the nav radio exists.
+9. **The +6 frame offset is NOT right for the shuttle.** Phase 0's `+6` was fit on player
+   feet, whose error curve is flat over ±10 frames. The shuttle moves 20+ px/frame and
+   pins the true contact sharply: TrackNetV3-vs-label best offset peaks at **SS frame − 1**
+   (video frames) on the India Open match. Use −1 for shuttle/hit-event alignment; keep +6
+   for the (insensitive) player tracks. Residual ~90 px median at contact is largely
+   ShuttleSet click noise + motion-blur lag on smashes — verified visually (zoom crops
+   show TrackNet within ~15 px of the real shuttle).
+10. **`ffmpeg -ss` second-based cuts are NOT frame-exact** for validation purposes — use
+   `shuttle.cut_exact()` (cv2 seek by frame index) when frame numbers must line up.
 
 ## 9. Add a new match (multi-match is supported; done twice now)
 1. Find the match folder in ShuttleSet22 (`CoachAI-Projects/CoachAI-Challenge-IJCAI2023/
@@ -154,6 +165,16 @@ It then appears in the dashboard's Match selector automatically (uncalibrated ma
 a friendly setup notice instead of a crash).
 
 ## 10. Suggested next steps
+- **Phase 2 IN PROGRESS (2026-06-10).** TrackNetV3 integrated (`shuttle.py`, validated
+  visually + vs labels on set-1 rally-1); full India-Open run was launched (~2 h, check
+  `data/shuttle_pred/india_open_2022_final/` for the CSV + `shuttle` table row count).
+  Geometry shot baseline done (`shotclass.py`, 84–88% cross-match). Next: (a) full-match
+  shuttle validation at offset −1 across all 1,063 strokes; (b) hit detection from
+  trajectory direction-reversal + nearest player; (c) landing = last descending arc →
+  floor crossing → homography; (d) BST adapter — `third_party/BST` is cloned, pretrained
+  ShuttleSet weights + preprocessed eval npy are on its README's Google Drive links;
+  inputs (17 COCO joints bbox-normalized, court-normalized positions, shuttle xy) all
+  exist in our `tracks`/`shuttle` tables. CPU/MPS-friendly (plain PyTorch).
 - **Tactical commentary layer: WORKING (2026-06-10).** `commentary.py` + the 🎙️ Commentary
   dashboard page, generated end-to-end with Gemini (free tier, key in `.env`) for both
   matches. Multi-provider: add `ANTHROPIC_API_KEY` to `.env` to enable the Claude option

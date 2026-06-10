@@ -18,3 +18,9 @@ matplotlib
 # Commentary layer (LLM match reports; keys in .env — GEMINI_API_KEY / ANTHROPIC_API_KEY)
 anthropic
 requests
+
+# Phase 2 — shuttle tracking (TrackNetV3 vendored in third_party/) + shot classes
+gdown                    # fetch TrackNetV3/BST checkpoints from Google Drive
+parse                    # TrackNetV3 dep
+pycocotools              # TrackNetV3 dep (via its test.py)
+scikit-learn             # geometry shot-class baseline (shotclass.py)
