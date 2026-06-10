@@ -32,17 +32,37 @@ CLASSES = insights.SHOT_ORDER
 
 CV_FEATURES = ["hitter_nx", "hitter_ny", "recv_nx", "recv_ny", "land_nx", "land_ny",
                "ball_round", "dt_prev", "dt_next", "depth_delta", "lat_delta",
-               "speed_proxy", "opp_depth_delta"]
+               "speed_proxy", "opp_depth_delta", "contact_rel_px"]
 LAB_FEATURES = ["low_contact", "backhand", "aroundhead"]
 
 
-def build_features(match_id: str) -> pd.DataFrame:
-    """One row per labeled stroke with geometry features + shot label."""
+def build_features(match_id: str, feet_landing: bool = False) -> pd.DataFrame:
+    """One row per labeled stroke with geometry features + shot label.
+
+    feet_landing=True swaps the landing convention to match the CV pipeline:
+    landing of stroke i := the NEXT stroke's hitter position (feet, on the floor
+    plane) instead of the mid-air landing click; final strokes keep the labeled
+    floor landing. Train with this when classifying pipeline-built strokes.
+    """
     sdf = insights.stroke_df(match_id).copy()
     sdf = sdf.sort_values(["set_no", "rally_id", "ball_round"])
     g = sdf.groupby(["set_no", "rally_id"])
     sdf["dt_prev"] = g["frame_num"].diff()
     sdf["dt_next"] = -g["frame_num"].diff(-1)
+
+    if feet_landing:
+        from . import court
+        nx_next = g["hitter_mx"].shift(-1)
+        ny_next = g["hitter_my"].shift(-1)
+        last = nx_next.isna()
+        sdf["land_mx"] = np.where(last, sdf["land_mx"], nx_next)
+        sdf["land_my"] = np.where(last, sdf["land_my"], ny_next)
+        smap = insights.side_map_from(sdf)
+        flip = sdf.apply(lambda r: smap.get((r.set_no, r.hitter)) == "far",
+                         axis=1).to_numpy()
+        W, L = court.COURT_WIDTH_M, court.COURT_LENGTH_M
+        sdf["land_nx"] = np.where(flip, W - sdf["land_mx"], sdf["land_mx"])
+        sdf["land_ny"] = np.where(flip, L - sdf["land_my"], sdf["land_my"])
 
     sdf["depth_delta"] = sdf["land_ny"] - sdf["hitter_ny"]    # how far up-court it goes
     sdf["lat_delta"] = (sdf["land_nx"] - sdf["hitter_nx"]).abs()
@@ -50,15 +70,19 @@ def build_features(match_id: str) -> pd.DataFrame:
     sdf["speed_proxy"] = dist / sdf["dt_next"]                # court-m per frame
     sdf["opp_depth_delta"] = sdf["land_ny"] - sdf["recv_ny"]  # landing vs opponent depth
 
+    # contact height proxy: shuttle-at-contact vs hitter feet, image px (negative =
+    # above the feet; both the labels and the CV pipeline can compute this)
+    sdf["contact_rel_px"] = sdf["hit_y"] - sdf["hitter_y"]
+
     sdf["low_contact"] = (sdf["hit_height"] == 2).astype(float)
     sdf["backhand"] = sdf["backhand"].astype(float)
     sdf["aroundhead"] = sdf["aroundhead"].astype(float)
 
     sdf["match_id"] = match_id
     keep = sdf["shot"].isin(CLASSES)
-    return sdf.loc[keep, ["match_id", "set_no", "rally_id", "ball_round", "shot"]
-                   + CV_FEATURES[:6] + ["dt_prev", "dt_next", "depth_delta", "lat_delta",
-                                        "speed_proxy", "opp_depth_delta"] + LAB_FEATURES]
+    cols = list(dict.fromkeys(["match_id", "set_no", "rally_id", "ball_round", "shot"]
+                              + CV_FEATURES + LAB_FEATURES))
+    return sdf.loc[keep, cols]
 
 
 def _model():
