@@ -89,6 +89,7 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 | `render_overlay.py` | annotated overlay video (boxes + minimap + SS labels) |
 | `viz.py` | top-down court minimap (cv2) + `mpl_court` (matplotlib) |
 | `shuttle.py` | Phase 2: TrackNetV3 shuttle tracking → `shuttle` table. Runs the vendored `third_party/TrackNetV3` predict.py unmodified via runpy with `.cuda()`→MPS + `torch.load`→CPU monkeypatches. `--window F0 F1` = frame-accurate cv2 cut of the match video; full-match mode uses `--large_video`. ~12–18 fps on MPS. Setup: `git clone qaz812345/TrackNetV3 third_party/TrackNetV3` + `gdown 1CfzE87a0f6LhBp0kniSl1-89zaLCZ8cA` → unzip to its `ckpts/`. |
+| `hits.py` | Phase 2: hit detection + landing points from the shuttle track. Hits = union of two per-frame signals over ±4-frame velocities — \|Δv\| ≥ 30 px/f (accelerations; a smash off a descending lob has NO 2D direction turn, this was the key insight) and (1−cosθ)·speed ≥ 20 (reversals, slow net play) — plus a raw-series gap-boundary pass (blur hides contact) and a motion-onset serve detector (serves have v_in≈0, can't kink). **India Open: P 89.2% / R 86.7% / F1 87.9 (tol ±6), attribution 90.0%** (nearest wrist from `tracks` keypoints — NOTE tracks & shuttle share the video timeline, no offset between them). Landing = lowest screen point of the continuous post-hit track (gap-chained, jump-gated) → homography: **median 0.548 m, p90 2.34 m (n=52)** vs labeled landings. Thresholds tuned on India Open — Denmark is a clean held-out test. |
 | `shotclass.py` | Phase 2: geometry-only shot classifier (sklearn HistGB, NaN-native). CV-deployable features (normalized positions, landing, dt, derived speed/deltas): **87.8% / 84.0% cross-match, 87.2% pooled 5-fold** on the 10 canonical classes. Labeled contact-height adds only ~1 pt. Weak classes: drive, push/rush (pose needed — BST's job). |
 | `scripts/parse_match.py` | chunked/resumable full-match parse |
 | `app.py` | Streamlit dashboard (7 tabs) |
@@ -172,10 +173,12 @@ a friendly setup notice instead of a crash).
   footage), validated vs all 980 labeled hit points: **99.8% detected, median 115.5 px at
   offset −1** (≈ label-noise floor; see gotcha 9). 3h50m wall on MPS (~12 fps with the
   sliding-window ensemble; `--eval-mode nonoverlap` is ~8× faster if a match needs a quick
-  pass). Geometry shot baseline done (`shotclass.py`, 84–88% cross-match). Next:
-  (a) hit detection from trajectory direction-reversal + nearest player (also yields OUR
-  contact frames, removing the label-offset dependence); (b) landing = last descending
-  arc → floor crossing → homography, vs labeled landing_x/y; (c) BST adapter —
+  pass). Geometry shot baseline done (`shotclass.py`, 84–88% cross-match). Hit detection
+  + landings DONE (`hits.py`: F1 87.9, attribution 90%, landings 0.548 m median — see
+  module map). Next: (a) re-validate `hits.py` on denmark_open_2022_sf once its shuttle
+  run lands (thresholds were tuned on India Open — that's the honest held-out test);
+  (b) wire detected hits into `strokes` source='pipeline' rows (serve-onset rally
+  segmentation + hits + landings = label-free Tier-1); (c) BST adapter —
   `third_party/BST` cloned, pretrained ShuttleSet weights + preprocessed eval npy on its
   README Drive links; inputs (17 COCO joints bbox-normalized, court-normalized positions,
   shuttle xy) all exist in our `tracks`/`shuttle` tables. CPU/MPS-friendly (plain PyTorch).
