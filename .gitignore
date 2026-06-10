@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Data & DB (large / derived — parse once, cached in DuckDB)
+data/raw/
+data/db/
+data/clips/
+data/logs/
+*.duckdb
+*.mp4
+*.mkv
+*.webm
+*.part
+
+# Model weights (auto-downloaded by ultralytics)
+*.pt
+
+# OS
+.DS_Store

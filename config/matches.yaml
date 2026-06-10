@@ -1,0 +1,68 @@
+india_open_2022_final:
+  match_id: india_open_2022_final
+  discipline: singles
+  player_near: null
+  player_far: null
+  tournament: YONEX SUNRISE India Open 2022
+  round: Finals
+  match_date: 2022-01-16
+  players:
+  - Loh Kean Yew
+  - Lakshya Sen
+  shuttleset_dir: Lakshya_SEN_LOH_Kean_Yew_YONEX_SUNRISE_India_Open_2022_ Finals
+  video_url: https://youtu.be/7_O5r9CLOVw
+  video_path: data/raw/india_open_2022_final.mp4
+  fps: 30.0
+  court_corners_px:
+  - - 185.0
+    - 658.0
+  - - 1010.0
+    - 653.0
+  - - 858.0
+    - 277.0
+  - - 372.0
+    - 278.0
+  homography:
+  - 0.025450104494209848
+  - 0.01252413036951906
+  - -12.949147114572362
+  - -0.00043644175975959284
+  - -0.0720128903603327
+  - 47.465223582654446
+  - -1.3805945470273173e-05
+  - 0.0037453302283051394
+  - 1.0
+denmark_open_2022_sf:
+  match_id: denmark_open_2022_sf
+  discipline: singles
+  player_near: null
+  player_far: null
+  tournament: VICTOR Denmark Open 2022
+  round: Semi-finals
+  match_date: 2022-10-22
+  players:
+  - Loh Kean Yew
+  - Lee Zii Jia
+  shuttleset_dir: Lee_Zii_Jia_Loh_Kean_Yew_Denmark_Open_2022_Semifinals
+  video_url: https://www.youtube.com/watch?v=jaRBm3uc3jU
+  video_path: data/raw/denmark_open_2022_sf.mp4
+  fps: 30.0
+  court_corners_px:
+  - - 306
+    - 654
+  - - 996
+    - 651
+  - - 838
+    - 266
+  - - 449
+    - 267
+  homography:
+  - 0.033697652342939345
+  - 0.012451587299845806
+  - -18.454819711038596
+  - -0.000324301297837965
+  - -0.07458929850272987
+  - 48.88063741792376
+  - 1.181880206809228e-06
+  - 0.004307835473704193
+  - 1.0

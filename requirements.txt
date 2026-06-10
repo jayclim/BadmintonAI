@@ -1,0 +1,11 @@
+# Phase 0 (court + feet) — lightweight, runs on Apple Silicon CPU/MPS
+yt-dlp
+opencv-python
+numpy
+duckdb
+polars
+pyyaml
+
+# Phase 0 detection/pose (heavier; installs torch). Uncomment when reaching step 4:
+# ultralytics            # YOLO11-Pose (AGPL-3.0 — prototype only; migrate to RTMPose later)
+# supervision            # overlay/annotation helpers
