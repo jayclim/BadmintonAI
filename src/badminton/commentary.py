@@ -1,14 +1,19 @@
 """LLM tactical commentary: a coach's match report generated from the stats tables.
 
 Pipeline: build_dossier() condenses the insights/tactics layer into a compact
-JSON dossier (real player names, no A/B) → Claude (structured output, adaptive
-thinking) turns it into a MatchCommentary → cached at data/commentary/<match_id>.json
-so each match is generated once (same parse-once philosophy as the DuckDB cache).
+JSON dossier (real player names, no A/B) → an LLM turns it into a MatchCommentary
+(pydantic-validated) → cached at data/commentary/<match_id>.<provider>.json so each
+match is generated once per provider (same parse-once philosophy as the DuckDB cache).
 
-Credentials: anthropic.Anthropic() resolves ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN /
-an `ant auth login` profile. has_credentials() lets the dashboard degrade gracefully.
+Providers (toggleable; keys live in the gitignored .env at the repo root):
+- "gemini" — GEMINI_API_KEY (+ optional GEMINI_MODEL, default gemini-2.5-flash). REST,
+  JSON mode; the response schema is enforced by validating with pydantic.
+- "claude" — ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN (+ optional CLAUDE_MODEL).
+  Native structured output via messages.parse, adaptive thinking.
+default_provider() prefers gemini (free tier) when both keys are present.
 
-CLI:  PYTHONPATH=src python -m badminton.commentary <match_id> [--force]
+CLI:  PYTHONPATH=src python -m badminton.commentary <match_id> [--provider gemini|claude]
+      [--force | --dossier-only]
 """
 
 from __future__ import annotations
@@ -23,8 +28,21 @@ from pydantic import BaseModel, Field
 
 from . import config, insights, tactics
 
-MODEL = "claude-opus-4-8"
+PROVIDERS = ("gemini", "claude")          # default_provider() preference order
 CACHE_DIR = Path("data/commentary")
+
+
+def _load_dotenv() -> None:
+    """Load KEY=value lines from the repo-root .env into os.environ (no override)."""
+    p = config.REPO_ROOT / ".env"
+    if not p.exists():
+        return
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip("'\""))
 
 SYSTEM = """You are a world-class badminton coach and analyst writing a post-match \
 tactical report on a professional men's singles match. You are given a statistical \
@@ -184,60 +202,125 @@ def build_dossier(match_id: str) -> dict:
     })
 
 
-# ---------------------------------------------------------------- generation
+# ---------------------------------------------------------------- providers
+
+def available_providers() -> list[str]:
+    """Providers we have credentials for, in preference order."""
+    _load_dotenv()
+    out = []
+    if os.environ.get("GEMINI_API_KEY"):
+        out.append("gemini")
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        out.append("claude")
+    return out
+
+
+def default_provider() -> str | None:
+    avail = available_providers()
+    return avail[0] if avail else None
+
 
 def has_credentials() -> bool:
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        return True
-    cfg = Path(os.environ.get("ANTHROPIC_CONFIG_DIR",
-                              Path.home() / ".config" / "anthropic"))
-    return (cfg / "credentials").is_dir()
+    return bool(available_providers())
 
 
-def cache_path(match_id: str) -> Path:
-    return CACHE_DIR / f"{match_id}.json"
+def _parse_commentary(text: str) -> MatchCommentary:
+    """Validate model output, tolerating markdown code fences."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    return MatchCommentary.model_validate_json(text)
 
 
-def cached(match_id: str) -> dict | None:
-    p = cache_path(match_id)
-    if p.exists():
-        return json.loads(p.read_text())
-    return None
-
-
-def generate(match_id: str, force: bool = False) -> dict:
-    """Generate (or return cached) commentary. Raises on missing credentials/API errors."""
-    if not force:
-        hit = cached(match_id)
-        if hit is not None:
-            return hit
-
+def _generate_claude(prompt: str) -> tuple[MatchCommentary, str, dict]:
     import anthropic
 
-    dossier = build_dossier(match_id)
-    prompt = ("Here is the match dossier as JSON. Write the tactical report.\n\n"
-              + json.dumps(dossier, indent=1, ensure_ascii=False))
-
+    model = os.environ.get("CLAUDE_MODEL", "claude-opus-4-8")
     client = anthropic.Anthropic()
     response = client.messages.parse(
-        model=MODEL,
+        model=model,
         max_tokens=16000,
         thinking={"type": "adaptive"},
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
         output_format=MatchCommentary,
     )
+    usage = {"input_tokens": response.usage.input_tokens,
+             "output_tokens": response.usage.output_tokens}
+    return response.parsed_output, model, usage
+
+
+def _generate_gemini(prompt: str) -> tuple[MatchCommentary, str, dict]:
+    import requests
+
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    schema = json.dumps(MatchCommentary.model_json_schema(), indent=1)
+    body = {
+        "system_instruction": {"parts": [{"text": SYSTEM}]},
+        "contents": [{"role": "user", "parts": [{"text":
+            prompt + "\n\nRespond with a single JSON object matching this JSON schema "
+                     "exactly (no markdown, no extra keys):\n" + schema}]}],
+        "generationConfig": {"response_mime_type": "application/json"},
+    }
+    r = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        params={"key": os.environ["GEMINI_API_KEY"]}, json=body, timeout=300)
+    if not r.ok:
+        raise RuntimeError(f"Gemini API {r.status_code}: {r.text[:500]}")
+    data = r.json()
+    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    um = data.get("usageMetadata", {})
+    usage = {"input_tokens": um.get("promptTokenCount"),
+             "output_tokens": um.get("candidatesTokenCount")}
+    return _parse_commentary(text), model, usage
+
+
+_GENERATORS = {"claude": _generate_claude, "gemini": _generate_gemini}
+
+
+# ---------------------------------------------------------------- generation + cache
+
+def cache_path(match_id: str, provider: str) -> Path:
+    return CACHE_DIR / f"{match_id}.{provider}.json"
+
+
+def cached(match_id: str, provider: str | None = None) -> dict | None:
+    """Cached report for one provider, or — provider=None — the freshest of any."""
+    paths = ([cache_path(match_id, provider)] if provider
+             else [cache_path(match_id, p) for p in PROVIDERS])
+    hits = [p for p in paths if p.exists()]
+    if not hits:
+        return None
+    return json.loads(max(hits, key=lambda p: p.stat().st_mtime).read_text())
+
+
+def generate(match_id: str, provider: str | None = None, force: bool = False) -> dict:
+    """Generate (or return cached) commentary. Raises on missing credentials/API errors."""
+    _load_dotenv()
+    provider = provider or default_provider()
+    if provider is None:
+        raise RuntimeError("No LLM credentials — put GEMINI_API_KEY (or ANTHROPIC_API_KEY) "
+                           "in the repo-root .env")
+    if not force:
+        hit = cached(match_id, provider)
+        if hit is not None:
+            return hit
+
+    dossier = build_dossier(match_id)
+    prompt = ("Here is the match dossier as JSON. Write the tactical report.\n\n"
+              + json.dumps(dossier, indent=1, ensure_ascii=False))
+    parsed, model, usage = _GENERATORS[provider](prompt)
 
     record = {
         "match_id": match_id,
-        "model": MODEL,
+        "provider": provider,
+        "model": model,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "usage": {"input_tokens": response.usage.input_tokens,
-                  "output_tokens": response.usage.output_tokens},
-        "commentary": response.parsed_output.model_dump(),
+        "usage": usage,
+        "commentary": parsed.model_dump(),
     }
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_path(match_id).write_text(json.dumps(record, indent=2, ensure_ascii=False))
+    cache_path(match_id, provider).write_text(json.dumps(record, indent=2, ensure_ascii=False))
     return record
 
 
@@ -259,6 +342,8 @@ def to_markdown(record: dict) -> str:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Generate LLM tactical commentary for a match")
     ap.add_argument("match_id")
+    ap.add_argument("--provider", choices=PROVIDERS, default=None,
+                    help="LLM to use (default: first with credentials — gemini, then claude)")
     ap.add_argument("--force", action="store_true", help="regenerate even if cached")
     ap.add_argument("--dossier-only", action="store_true",
                     help="print the dossier JSON and exit (no API call)")
@@ -266,4 +351,5 @@ if __name__ == "__main__":
     if args.dossier_only:
         print(json.dumps(build_dossier(args.match_id), indent=2, ensure_ascii=False))
     else:
-        print(to_markdown(generate(args.match_id, force=args.force)))
+        rec = generate(args.match_id, provider=args.provider, force=args.force)
+        print(to_markdown(rec))

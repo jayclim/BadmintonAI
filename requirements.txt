@@ -15,5 +15,6 @@ altair
 pandas
 matplotlib
 
-# Commentary layer (LLM match reports)
+# Commentary layer (LLM match reports; keys in .env — GEMINI_API_KEY / ANTHROPIC_API_KEY)
 anthropic
+requests

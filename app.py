@@ -846,25 +846,32 @@ def page_lab():
 # ================================================================== 🎙️ Commentary
 
 def page_commentary():
+    providers = commentary.available_providers()
     rec = commentary.cached(MATCH)
+
+    def provider_picker(label, key):
+        if len(providers) > 1:
+            return st.selectbox(label, providers, key=key)
+        return providers[0]
 
     if rec is None:
         st.markdown("#### 🎙️ AI coach's match report")
         st.info("No commentary generated for this match yet. Generation sends the "
-                "statistical dossier below (~6 KB, no video) to Claude once and caches "
+                "statistical dossier below (~6 KB, no video) to an LLM once and caches "
                 "the report in `data/commentary/`.")
         with st.expander("Preview the dossier that would be sent"):
             st.json(commentary.build_dossier(MATCH))
-        if not commentary.has_credentials():
-            st.warning("No Anthropic credentials found — run `ant auth login` or set "
-                       "`ANTHROPIC_API_KEY`, then restart the dashboard. You can also "
-                       "generate from the terminal:\n\n"
+        if not providers:
+            st.warning("No LLM credentials found — put `GEMINI_API_KEY` (or "
+                       "`ANTHROPIC_API_KEY`) in the repo-root `.env`, then rerun. "
+                       "Terminal alternative:\n\n"
                        f"`PYTHONPATH=src python -m badminton.commentary {MATCH}`")
             return
+        prov = provider_picker("Model", "comm_prov_gen")
         if st.button("✨ Generate the match report"):
             with st.spinner("The coach is reviewing the match… (~1 minute)"):
                 try:
-                    rec = commentary.generate(MATCH)
+                    rec = commentary.generate(MATCH, provider=prov)
                 except Exception as e:
                     st.error(f"Generation failed: {e}")
                     return
@@ -903,12 +910,19 @@ def page_commentary():
                 st.markdown(f"- {t}")
             st.markdown(f"**🎯 How to beat him:** {p['gameplan_against']}")
 
-    st.caption(f"Generated {rec['generated_at']} · {rec['model']} · "
-               f"{rec['usage']['input_tokens']:,} in / {rec['usage']['output_tokens']:,} out tokens")
-    if commentary.has_credentials():
+    u_in, u_out = rec["usage"].get("input_tokens"), rec["usage"].get("output_tokens")
+    tok = f" · {u_in:,} in / {u_out:,} out tokens" if u_in is not None else ""
+    st.caption(f"Generated {rec['generated_at']} · {rec.get('provider', '?')} "
+               f"({rec['model']}){tok}")
+    if providers:
+        prov = provider_picker("Regenerate with", "comm_prov_regen")
         if st.button("🔁 Regenerate"):
             with st.spinner("Regenerating…"):
-                commentary.generate(MATCH, force=True)
+                try:
+                    commentary.generate(MATCH, provider=prov, force=True)
+                except Exception as e:
+                    st.error(f"Generation failed: {e}")
+                    return
             st.rerun()
 
 

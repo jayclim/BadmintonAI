@@ -36,8 +36,8 @@ coexist and are pickable. To add a new match:
 ## Viewing results
 - **Coaching dashboard:** `PYTHONPATH=src .venv/bin/streamlit run app.py` — seven pages:
   Match story (score worm + auto Coach's notes that deep-link to the supporting rally
-  clips), Commentary (LLM tactical match report; needs `ANTHROPIC_API_KEY` or
-  `ant auth login`, cached after first generation), Points won & lost, Court maps
+  clips), Commentary (LLM tactical match report — Gemini or Claude, key in the
+  repo-root `.env`, cached per provider after first generation), Points won & lost, Court maps
   (shot placement + movement), Patterns & pressure, Film room (filterable rally clips
   with rally map + per-shot pressure), and Lab (CV validation diagnostics;
   see [`docs/PHASE0_RESULTS.md`](docs/PHASE0_RESULTS.md)).

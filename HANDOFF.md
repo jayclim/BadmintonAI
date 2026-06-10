@@ -84,7 +84,7 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 | `analytics.py` | movement metrics: `player_metrics`, `summary`, `rallies`, `match_aggregate` |
 | `tactics.py` | `shot_outcomes`, `pressure_*`, `pressure_by_shot`, `rally_patterns`, `rally_detail` |
 | `insights.py` | coach-facing derived data: `stroke_df`/`rally_df` (court-metre + normalized coords, winner from score deltas), `side_map` (per-set near/far↔A/B), placement/serve/clutch/pattern/error-pressure stats, `movement_by_player` (side-swap aware), `coach_notes` (rule-based insight cards w/ supporting rally keys) |
-| `commentary.py` | LLM tactical match report: `build_dossier` (~6 KB JSON from insights/tactics, real names), `generate` (Claude `claude-opus-4-8`, structured output via pydantic, adaptive thinking), cached at `data/commentary/<match_id>.json`. CLI: `python -m badminton.commentary <id> [--force\|--dossier-only]`. Needs `ANTHROPIC_API_KEY` or `ant auth login`. |
+| `commentary.py` | LLM tactical match report: `build_dossier` (~6 KB JSON from insights/tactics, real names) → provider-pluggable `generate` (gemini = REST + JSON mode, claude = `messages.parse` structured output; both pydantic-validated) → cached at `data/commentary/<id>.<provider>.json`. Keys in repo-root `.env` (gitignored): `GEMINI_API_KEY` (default provider, free tier; `GEMINI_MODEL` overrides gemini-2.5-flash) / `ANTHROPIC_API_KEY`. CLI: `python -m badminton.commentary <id> [--provider g\|c] [--force\|--dossier-only]`. |
 | `clip.py` | `list_rallies`, `clip_rally` (raw), `annotated_rally` (detect+render, skips detect if parsed), `reason_en` |
 | `render_overlay.py` | annotated overlay video (boxes + minimap + SS labels) |
 | `viz.py` | top-down court minimap (cv2) + `mpl_court` (matplotlib) |
@@ -154,12 +154,14 @@ It then appears in the dashboard's Match selector automatically (uncalibrated ma
 a friendly setup notice instead of a crash).
 
 ## 10. Suggested next steps
-- **Tactical commentary layer: BUILT (2026-06-10), needs first generation.** `commentary.py`
-  + the 🎙️ Commentary dashboard page are wired end-to-end; no Anthropic credentials were
-  configured on this machine, so no report has actually been generated yet. Run
-  `ant auth login` (CLI installed) or export `ANTHROPIC_API_KEY`, then
-  `PYTHONPATH=src python -m badminton.commentary india_open_2022_final` and review the
-  output quality (tune `SYSTEM` / dossier contents if it's generic or hallucinatory).
+- **Tactical commentary layer: WORKING (2026-06-10).** `commentary.py` + the 🎙️ Commentary
+  dashboard page, generated end-to-end with Gemini (free tier, key in `.env`) for both
+  matches. Multi-provider: add `ANTHROPIC_API_KEY` to `.env` to enable the Claude option
+  (better model; untested path — verify on first use). Possible refinements: per-set
+  commentary, rally-level evidence links (reuse coach-note keys → Film room deep links),
+  prompt tuning in `SYSTEM`.
+  Note: a stray `/opt/homebrew/bin/ant` exists but it's **Apache Ant**, not the Anthropic
+  CLI — don't suggest `ant auth login` on this machine.
 - **Phase 2 shuttle tracking** (TrackNetV3 → MonoTrack) for landing points / shot classes
   from video rather than relying on ShuttleSet labels.
 - **Far-court accuracy / robustness**: small-target pose is the weak spot (see PHASE0_RESULTS).
