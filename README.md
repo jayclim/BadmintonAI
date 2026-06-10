@@ -34,11 +34,13 @@ coexist and are pickable. To add a new match:
 4. `python scripts/parse_match.py --match <match_id>` — parse it once (cached forever after).
 
 ## Viewing results
-- **Coaching dashboard:** `PYTHONPATH=src .venv/bin/streamlit run app.py` — six pages:
+- **Coaching dashboard:** `PYTHONPATH=src .venv/bin/streamlit run app.py` — seven pages:
   Match story (score worm + auto Coach's notes that deep-link to the supporting rally
-  clips), Points won & lost, Court maps (shot placement + movement), Patterns & pressure,
-  Film room (filterable rally clips with rally map + per-shot pressure), and Lab
-  (CV validation diagnostics; see [`docs/PHASE0_RESULTS.md`](docs/PHASE0_RESULTS.md)).
+  clips), Commentary (LLM tactical match report; needs `ANTHROPIC_API_KEY` or
+  `ant auth login`, cached after first generation), Points won & lost, Court maps
+  (shot placement + movement), Patterns & pressure, Film room (filterable rally clips
+  with rally map + per-shot pressure), and Lab (CV validation diagnostics;
+  see [`docs/PHASE0_RESULTS.md`](docs/PHASE0_RESULTS.md)).
 - **Annotated overlay video:** `data/raw/overlay.mp4` — player boxes + foot-dots, live
   top-down minimap, ShuttleSet labels overlaid. Re-render any window:
   `python -m badminton.detect <match> --start-frame F --max-frames N` then

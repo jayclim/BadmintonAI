@@ -6,6 +6,14 @@ duckdb
 polars
 pyyaml
 
-# Phase 0 detection/pose (heavier; installs torch). Uncomment when reaching step 4:
-# ultralytics            # YOLO11-Pose (AGPL-3.0 — prototype only; migrate to RTMPose later)
-# supervision            # overlay/annotation helpers
+# Detection/pose (heavy; installs torch + MPS)
+ultralytics              # YOLO11-Pose (AGPL-3.0 — prototype only; migrate to RTMPose later)
+
+# Phase 1 — analytics dashboard
+streamlit
+altair
+pandas
+matplotlib
+
+# Commentary layer (LLM match reports)
+anthropic

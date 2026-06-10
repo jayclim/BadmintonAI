@@ -22,21 +22,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
-from badminton import analytics, clip, config, court, db, insights, tactics, viz
+from badminton import analytics, clip, commentary, config, court, db, insights, tactics, viz
 
 # Dev convenience: Streamlit hot-reloads only app.py, not imported submodules — so edits
 # to badminton/*.py would otherwise be ignored until a full server restart. Reload them
 # (leaf deps first) on every rerun so changes are picked up live.
 import importlib
-for _mod in (config, court, db, viz, analytics, clip, tactics, insights):
+for _mod in (config, court, db, viz, analytics, clip, tactics, insights, commentary):
     importlib.reload(_mod)
 
 SS_OFFSET = 6
 GREEN, RED = "#2f9e44", "#e03131"
 WIN_C, ERR_C, RALLY_C = "#43e08a", "#ff5e57", "#d7e3d7"
-PAGES = ["📖 Match story", "🎯 Points won & lost", "🗺️ Court maps",
+PAGES = ["📖 Match story", "🎙️ Commentary", "🎯 Points won & lost", "🗺️ Court maps",
          "🧠 Patterns & pressure", "🎞️ Film room", "🔬 Lab"]
-PAGE_FILM = PAGES[4]
+PAGE_FILM = "🎞️ Film room"
 
 st.set_page_config(page_title="Badminton Coach", page_icon="🏸", layout="wide")
 
@@ -843,17 +843,79 @@ def page_lab():
             st.info("Download the match video first.")
 
 
+# ================================================================== 🎙️ Commentary
+
+def page_commentary():
+    rec = commentary.cached(MATCH)
+
+    if rec is None:
+        st.markdown("#### 🎙️ AI coach's match report")
+        st.info("No commentary generated for this match yet. Generation sends the "
+                "statistical dossier below (~6 KB, no video) to Claude once and caches "
+                "the report in `data/commentary/`.")
+        with st.expander("Preview the dossier that would be sent"):
+            st.json(commentary.build_dossier(MATCH))
+        if not commentary.has_credentials():
+            st.warning("No Anthropic credentials found — run `ant auth login` or set "
+                       "`ANTHROPIC_API_KEY`, then restart the dashboard. You can also "
+                       "generate from the terminal:\n\n"
+                       f"`PYTHONPATH=src python -m badminton.commentary {MATCH}`")
+            return
+        if st.button("✨ Generate the match report"):
+            with st.spinner("The coach is reviewing the match… (~1 minute)"):
+                try:
+                    rec = commentary.generate(MATCH)
+                except Exception as e:
+                    st.error(f"Generation failed: {e}")
+                    return
+        if rec is None:
+            return
+
+    c = rec["commentary"]
+    st.markdown(f"### {c['headline']}")
+    st.markdown(c["match_story"])
+    st.markdown("##### ⚡ Turning points")
+    for t in c["turning_points"]:
+        st.markdown(f"- {t}")
+
+    # one column per player, B left / A right to match the rest of the dashboard
+    by_name = {p["name"]: p for p in c["players"]}
+    reports = [by_name.get(NAME[k]) for k in ("B", "A")]
+    if None in reports:                       # name mismatch fallback: dossier order
+        reports = c["players"][:2]
+    cols = st.columns(2)
+    for col, p in zip(cols, reports):
+        key = next((k for k in ("A", "B") if NAME[k] == p["name"]), None)
+        with col, st.container(border=True):
+            if key is not None:
+                st.markdown(f"##### {chip(p['name'], COLOR[key])}", unsafe_allow_html=True)
+            else:
+                st.markdown(f"##### {p['name']}")
+            st.markdown(p["overview"])
+            st.markdown("**🗡️ Strengths**")
+            for s in p["strengths"]:
+                st.markdown(f"- {s}")
+            st.markdown("**⚠️ Weaknesses**")
+            for w in p["weaknesses"]:
+                st.markdown(f"- {w}")
+            st.markdown("**🏋️ Training priorities**")
+            for t in p["training_priorities"]:
+                st.markdown(f"- {t}")
+            st.markdown(f"**🎯 How to beat him:** {p['gameplan_against']}")
+
+    st.caption(f"Generated {rec['generated_at']} · {rec['model']} · "
+               f"{rec['usage']['input_tokens']:,} in / {rec['usage']['output_tokens']:,} out tokens")
+    if commentary.has_credentials():
+        if st.button("🔁 Regenerate"):
+            with st.spinner("Regenerating…"):
+                commentary.generate(MATCH, force=True)
+            st.rerun()
+
+
 # ------------------------------------------------------------------ dispatch
 
-if page == PAGES[0]:
-    page_story()
-elif page == PAGES[1]:
-    page_points()
-elif page == PAGES[2]:
-    page_maps()
-elif page == PAGES[3]:
-    page_patterns()
-elif page == PAGE_FILM:
-    page_film()
-else:
-    page_lab()
+PAGE_FN = {"📖 Match story": page_story, "🎙️ Commentary": page_commentary,
+           "🎯 Points won & lost": page_points, "🗺️ Court maps": page_maps,
+           "🧠 Patterns & pressure": page_patterns, PAGE_FILM: page_film,
+           "🔬 Lab": page_lab}
+PAGE_FN[page]()

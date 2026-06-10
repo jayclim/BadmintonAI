@@ -9,6 +9,7 @@ data/raw/
 data/db/
 data/clips/
 data/logs/
+data/commentary/
 *.duckdb
 *.mp4
 *.mkv
