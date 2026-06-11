@@ -29,8 +29,11 @@ from . import config, hits, insights
 
 TEMPLATES = config.REPO_ROOT / "data" / "scoreboard_digits.npz"
 GLYPH_SHAPE = (14, 10)   # all glyph masks normalized to this for matching
-STRIP_W = 95             # px of score cells scanned right of the name strip
-NUM_GAP = 12             # px gap between glyph clusters = separate numbers
+STRIP_W = 130            # px of score cells right of the name strip (3 set
+                         # columns in a deciding game need ~110; was 95)
+NUM_GAP = 10             # px gap between glyph clusters = separate numbers
+                         # (digit gaps inside a number are 2-5 px; adjacent set
+                         # cells can sit exactly 12 px apart — All England 2022)
 MIN_MATCH = 0.55         # min normalized correlation to accept a digit
 
 
