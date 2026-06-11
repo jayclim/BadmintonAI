@@ -21,6 +21,8 @@ third_party/
 *.mkv
 *.webm
 *.part
+# …but the web app's annotated rally clips ship with the site (Vercel builds from git)
+!web/public/clips/**/*.mp4
 
 # Model weights (auto-downloaded by ultralytics)
 *.pt

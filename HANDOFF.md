@@ -14,7 +14,31 @@ surfaces movement + tactics + pressure analytics, plus rally video clips (raw & 
 **Direction (locked):** controlled-capture eventually (any decent camera) · analytics
 dashboard first → tactical commentary later · singles first → doubles later.
 
-## 2. Current status (as of 2026-06-09)
+## 2. Current status (as of 2026-06-11)
+- **LABEL-FREE COACH VIEW SHIPPED + NEW WEB APP (2026-06-11).** `labelfree.py` glues the
+  whole CV chain (pipeline strokes `set_no=0` + scoreboard OCR events) into
+  stroke_df/rally_df-compatible frames: snapshot at `data/labelfree/<id>.json` (built via
+  `python -m badminton.labelfree <id> --build --validate`). Validated: set finals correct
+  (OCR misses only the final points where the broadcast cuts away), side map 4/4 + 4/4,
+  rally winners 87%/76% under pessimistic order-alignment. AND the dashboard was
+  **redesigned as a static Next.js app in `web/`** (deployable on Vercel, root dir =
+  `web`): 6 views (Overview/Points/Court/Patterns/Film room/AI Lab) × 2 data sources
+  (GROUND TRUTH / AI VISION toggle) × 2 matches, all data precomputed by
+  `python -m badminton.export_web` into `web/public/data` (7.7 MB incl. per-rally replay
+  payloads + OCR crop demos). Video = YouTube embeds at frame timestamps (zero hosting).
+  See `docs/WEBAPP_DESIGN.md` and `web/README.md`. The Streamlit app remains as the
+  internal lab tool (unchanged this round).
+- **Web app round 2 (2026-06-11 pm):** minimalist restyle (Archivo + IBM Plex Mono,
+  ornament stripped); LLM commentary markdown rendered (`components/md.tsx`);
+  **AI-annotated rally clips for EVERY rally** (`scripts/render_web_clips.py` →
+  `web/public/clips/<match>/f<start>-<end>.mp4`, 540p ~0.7 MB each, 105 MB total,
+  ~3 s/rally to render; `render_overlay.render(ai_only=True)` adds BST shot calls +
+  OCR score readout, drops the ShuttleSet layer) behind a **persistent navbar
+  toggle** (localStorage, default ON; rallies map to clips by frame-window overlap
+  at export time so both sources share one clip set); two new coach analytics in
+  Patterns: **response matrix** ("vs X he plays Y n%, wins z%") and **opening
+  playbook** (serve type → hold% → returns → server win% vs each). NOTE root
+  `.gitignore` un-ignores `web/public/clips/**/*.mp4` — Vercel builds from git.
 - **Two matches fully wired end-to-end** (multi-match proven): the India Open 2022 final
   AND **denmark_open_2022_sf** (Lee Zii Jia def. Loh Kean Yew 21-18 21-15, Denmark Open
   2022 SF): 663 strokes imported, 93,375 track rows parsed (yolo11x@1280, 120 min),
@@ -86,15 +110,20 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 | `insights.py` | coach-facing derived data: `stroke_df`/`rally_df` (court-metre + normalized coords, winner from score deltas), `side_map` (per-set near/far↔A/B), placement/serve/clutch/pattern/error-pressure stats, `movement_by_player` (side-swap aware), `coach_notes` (rule-based insight cards w/ supporting rally keys) |
 | `commentary.py` | LLM tactical match report: `build_dossier` (~6 KB JSON from insights/tactics, real names) → provider-pluggable `generate` (gemini = REST + JSON mode, claude = `messages.parse` structured output; both pydantic-validated) → cached at `data/commentary/<id>.<provider>.json`. Keys in repo-root `.env` (gitignored): `GEMINI_API_KEY` (default provider, free tier; `GEMINI_MODEL` overrides gemini-2.5-flash) / `ANTHROPIC_API_KEY`. CLI: `python -m badminton.commentary <id> [--provider g\|c] [--force\|--dossier-only]`. |
 | `clip.py` | `list_rallies`, `clip_rally` (raw), `annotated_rally` (detect+render, skips detect if parsed), `reason_en` |
-| `render_overlay.py` | annotated overlay video (boxes + minimap + SS labels) |
+| `render_overlay.py` | annotated overlay video (boxes + pose skeletons + minimap + SS labels) |
 | `viz.py` | top-down court minimap (cv2) + `mpl_court` (matplotlib) |
 | `shuttle.py` | Phase 2: TrackNetV3 shuttle tracking → `shuttle` table. Runs the vendored `third_party/TrackNetV3` predict.py unmodified via runpy with `.cuda()`→MPS + `torch.load`→CPU monkeypatches. `--window F0 F1` = frame-accurate cv2 cut of the match video; full-match mode uses `--large_video`. ~12–18 fps on MPS. Setup: `git clone qaz812345/TrackNetV3 third_party/TrackNetV3` + `gdown 1CfzE87a0f6LhBp0kniSl1-89zaLCZ8cA` → unzip to its `ckpts/`. |
 | `hits.py` | Phase 2: hit detection + landing points from the shuttle track. Hits = union of two per-frame signals over ±4-frame velocities — \|Δv\| ≥ 30 px/f (accelerations; a smash off a descending lob has NO 2D direction turn, this was the key insight) and (1−cosθ)·speed ≥ 20 (reversals, slow net play) — plus a raw-series gap-boundary pass (blur hides contact) and a motion-onset serve detector (serves have v_in≈0, can't kink). **India Open: P 89.2% / R 86.7% / F1 87.9 (tol ±6), attribution 90.0%** (nearest wrist from `tracks` keypoints — NOTE tracks & shuttle share the video timeline, no offset between them). Landing = lowest screen point of the continuous post-hit track (gap-chained, jump-gated) → homography: **median 0.548 m, p90 2.34 m (n=52)** vs labeled landings. Thresholds tuned on India Open — Denmark is a clean held-out test. |
 | `bst_eval.py` | Phase 2: **pretrained BST-0** (CVPRW'26 SOTA, `third_party/BST` + `bst_weights/bst_0_JnB_bone_merged.pt`) evaluated on OUR CV inputs (YOLO pose bbox-normalized their way + TrackNetV3 shuttle/(1280,720), ±15-frame window at contact, m-order [far=Top, near=Bottom]): **71.8% shot class (10 EN), 98.2% side, 69.6% end-to-end** with zero fine-tuning — ≈ its published accuracy on its own preprocessing, and +15 pts over geometry-on-CV (56.6%). BST-0 takes (JnB, shuttle, video_len) — no court pos. Next: swap into `pipeline.py` at DETECTED hit frames (this eval centers on label frames); deps: positional-encodings, torchinfo. |
-| `pipeline.py` | Phase 2: **label-free Tier-1 writer** — detected hits + tracked positions + landings + **BST-0 shot classes** (`classify --no-bst` for geometry-only) → `strokes` `source='pipeline'` rows, written for BOTH matches. End-to-end vs labels with BST at detected hit frames: **india 85.1% coverage / 96.3% hitter / 72.6% shot on matched (61.5% e2e); denmark 81.6% / 96.9% / 83.4% (67.3% e2e)**. BST's side prediction overrides wrist attribution (hitter/receiver + positions swapped on disagreement: +6 pts hitter); geometry classifier (trains on the OTHER match, `feet_landing=True`) is the fallback for unknown/missing-weights. Key conventions: landing(i) = NEXT hitter's tracked feet (floor-plane-valid; the mid-air shuttle projects metres deep), implausible features gated to NaN. Rally windows + side map still come from labels (rally segmenter = the last label dependency). |
+| `pipeline.py` | Phase 2: **label-free Tier-1 writer** — detected hits + tracked positions + landings + **BST-0 shot classes** (`classify --no-bst` for geometry-only) → `strokes` `source='pipeline'` rows, written for BOTH matches. End-to-end vs labels with BST at detected hit frames: **india 85.1% coverage / 96.3% hitter / 72.6% shot on matched (61.5% e2e); denmark 81.6% / 96.9% / 83.4% (67.3% e2e)**. BST's side prediction overrides wrist attribution (hitter/receiver + positions swapped on disagreement: +6 pts hitter); geometry classifier (trains on the OTHER match, `feet_landing=True`) is the fallback for unknown/missing-weights. Key conventions: landing(i) = NEXT hitter's tracked feet (floor-plane-valid; the mid-air shuttle projects metres deep), implausible features gated to NaN. **`--label-free` swaps in segment.py rally windows (set_no=0, rally_id=rally_key) — costs only ~0.5–2 pts: india 84.5%/96.4%/72.5% (61.1% e2e), denmark 79.5%/96.8%/83.5% (65.8% e2e).** Side map (player NAMES per set) still needs labels or score OCR. |
+| `segment.py` | Phase 2: **label-free rally segmentation** (the last inference-time label dependency, now dropped). Camera runs = frames where BOTH players have in-court tracks (98% of rally frames vs 7–18% of gaps; shuttle visibility is USELESS — TrackNet fires on replays: 83–94% vs 77–82%) → bbox-height bands self-calibrated off the dominant run cluster (kills close-ups/zoom replays) → detect_hits per run, grouped at >90-frame gaps, split at dead-shuttle restarts (non-first hit with v_in < 2.5 px/f = pickup tap/knock-back; the real serve is itself a restart when pre-serve kinks precede it — SPLIT, don't truncate), wrist-distance gates (group median ≤ 150 px, trailing hits ≤ 130 px — floor/net impacts kink too), structural keep rules (hitter must alternate in 3+-hit groups; 2-hit groups need ≥13-frame spacing), fragments re-merged within 120 frames. **India (tuned): R 97.6 / P 97.6 / F1 97.6; Denmark (held-out, untouched): R 93.3 / P 94.6 / F1 94.0.** Start −2 median; end +38 (trailing real-but-post-label contacts). Misses are 1-stroke service faults with no camera run. Failed ideas (don't relearn): pixel court-line check (corners sit on line OUTER edge, 2–5 px per-line offsets), serve-stance gate (tracks missing 0.5 s pre-serve in 56/84 rallies), invisible/static rest spells (lobs leave the frame top ≤62 frames mid-rally). |
 | `shotclass.py` | Phase 2: geometry-only shot classifier (sklearn HistGB, NaN-native). CV-deployable features (normalized positions, landing, dt, derived speed/deltas): **87.8% / 84.0% cross-match, 87.2% pooled 5-fold** on the 10 canonical classes. Labeled contact-height adds only ~1 pt. Weak classes: drive, push/rush (pose needed — BST's job). |
+| `scoreboard.py` | Phase 2: **score-overlay OCR** — scores/winners/set boundaries/side map, label-free. BWF graphic = 2 gray name rows + dark score cells (completed sets first, current points LAST; digits ~12 px — tesseract fails, template matching works). Templates **auto-bootstrapped from a labeled match** (`--harvest`, sample just BEFORE the NEXT serve — the overlay updates 2–5 s late and sampling at +3.5 s contaminated digits 5/7/8 with off-by-one labels) → `data/scoreboard_digits.npz`, **transfers across tournaments** (harvested on india, 97.3% on denmark untouched). `events()` = debounced score-change events (2 consecutive identical samples; align to rallies by ORDER per set — overlay can lag 15+ s behind replays, and score pairs recur across sets). `side_map()` = winner row ↔ next-rally serve side (winner serves next), majority per set. **Validated: trajectory india 80/84 (95.2%), denmark 73/75 (97.3%); side map 4/4 + 4/4.** With segment.py this completes the label-free chain: windows + scores + winners + sets + side map. |
+| `labelfree.py` | **Label-free coach view assembly**: aligns scoreboard OCR events to pipeline rallies (each event → LATEST already-ended unassigned rally; overlay lags 2–15+ s), maps the match-winning OCR row to 'A' (ShuttleSet convention), derives the per-set side map from "winner serves next" (seg synthesized from pipeline strokes — no segment.py rerun). Snapshot (incl. raw OCR events) at `data/labelfree/<id>.json`; then `stroke_df`/`rally_df`/`side_map`/`pressure_*`/`movement_by_player`/`rally_detail` mirror the labeled API but on VIDEO frames (offset 0 — labeled sdf is SS frames +6). Rally winner categories Net/Out inferred from the CV landing. CLI: `--build --validate`. |
+| `export_web.py` | Static-data exporter for `web/`: per (match, source∈labels\|ai) one JSON bundle (rallies, slim strokes incl. per-stroke pressure, full insights, movement heat bins, cached LLM commentary) + per-rally replay payloads (tracks/shuttle/hits/refHits/arcs, lazy-loaded) + `showcase.json` (tracking/hit/segmentation validation, labels-vs-AI agreement + confusion, OCR events + scoreboard crop JPEGs). All exported frames are VIDEO frames. `--skip-slow` skips hit/segment validation reruns but preserves previous values. |
 | `scripts/parse_match.py` | chunked/resumable full-match parse |
-| `app.py` | Streamlit dashboard (7 tabs) |
+| `app.py` | Streamlit dashboard (7 tabs) — now the internal lab tool; the coach-facing app is `web/` |
+| `web/` | **COURTSIDE** Next.js 16 static app (TypeScript, Tailwind 4, custom SVG charts, no chart lib). Routes `/m/<id>/<labels\|ai>/<view>` prerendered via generateStaticParams. Notable: score worm, placement maps, movement heat, animated 2D rally replay (RAF over track payloads), AI Lab (pipeline stepper + rally X-ray + OCR demo + confusion matrix). Build `cd web && npm run build` → `out/`. Deploy: Vercel root dir `web`. Gotcha: CSS `transform` in an animation OVERRIDES an SVG element's `transform` attribute — nest animated `<g>` inside the positioned `<g>`. |
 
 ## 7. Key results (India Open 2022 final)
 - Validation: **0.566 m** median (near 0.53, far 0.59), p90 1.06.
@@ -181,14 +210,26 @@ a friendly setup notice instead of a crash).
   module map). **HELD-OUT TEST PASSED (denmark, all thresholds untouched, 2026-06-10):**
   hits P 90.2 / R 81.7 / F1 85.8 (india: 87.9), attribution 94.5%, landings median
   1.12 m; **BST 82.8% shot class / 82.0% end-to-end (india: 71.8/69.6)** — no overfit,
-  and BST beats geometry-on-CV by ~15–26 pts on both matches. Next: (a) swap BST into
-  `pipeline.py` at DETECTED hit frames (predict_df is the interface); (b) rally
-  segmentation (serve-onset + visibility runs + replay rejection) to drop the last
-  label dependency; (c) BST adapter —
-  `third_party/BST` cloned, pretrained ShuttleSet weights + preprocessed eval npy on its
-  README Drive links; inputs (17 COCO joints bbox-normalized, court-normalized positions,
-  shuttle xy) all exist in our `tracks`/`shuttle` tables. CPU/MPS-friendly (plain PyTorch).
-  (d) run `python -m badminton.shuttle denmark_open_2022_sf` overnight for match 2.
+  and BST beats geometry-on-CV by ~15–26 pts on both matches.
+  **RALLY SEGMENTATION DONE (2026-06-10, `segment.py` — see module map):** india
+  F1 97.6, denmark held-out F1 94.0; `pipeline.py --label-free` now runs with NO
+  ShuttleSet input at inference (india 61.1% e2e vs 61.5% labeled; denmark 65.8% vs
+  67.3%).
+  **SCORE OCR DONE (2026-06-11, `scoreboard.py` — see module map):** label-free
+  scores, per-rally winners, set boundaries AND the per-set side map (4/4 + 4/4
+  vs labels). ShuttleSet is now needed only for evaluation and for harvesting
+  the digit templates once (done, in repo at `data/scoreboard_digits.npz`).
+  **(a) DONE 2026-06-11:** the label-free coach view is live — `labelfree.py`
+  assembles it and the new `web/` app renders it (AI VISION toggle). Remaining
+  candidates: (a2) add-a-match ergonomics: a single CLI that runs parse →
+  shuttle → pipeline --label-free --write → labelfree --build → export_web for
+  a brand-new unlabeled match (every piece exists; it's sequencing + docs);
+  (b) wire scoreboard winners into segment.py validation to kill the remaining
+  shuttle-test false positives (a segment with no score change after it is not
+  a rally); (c) deciding-set mid-game end change at 11 in `side_map` (labels)
+  — note scoreboard.side_map votes per set and would catch it as a mid-set
+  flip if modeled; (d) overlay name-strip OCR (tesseract on the larger name
+  text) to map rows → player names with zero config.
 - **Tactical commentary layer: WORKING (2026-06-10).** `commentary.py` + the 🎙️ Commentary
   dashboard page, generated end-to-end with Gemini (free tier, key in `.env`) for both
   matches. Multi-provider: add `ANTHROPIC_API_KEY` to `.env` to enable the Claude option
