@@ -26,7 +26,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
 
   return (
     <div className="space-y-8">
-      <section className="grid lg:grid-cols-5 gap-4">
+      <section className="grid lg:grid-cols-5 gap-4 [&>*]:min-w-0">
         <Card className="lg:col-span-3">
           <Section
             kicker="REHEARSABLE SITUATIONS"
@@ -36,13 +36,13 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
             <Pills options={["2 shots", "3 shots"] as const} value={plen} onChange={setPlen} />
           </Section>
           {pats.length === 0 && <p className="text-mut text-[13px]">Not enough repeated patterns.</p>}
-          <div className="space-y-2">
+          <div className="space-y-2 overflow-x-auto">
             {pats.map((pt) => {
               const lean = Math.max(pt.a_wins, pt.b_wins) / pt.n;
               return (
                 <div
                   key={pt.pattern}
-                  className="grid grid-cols-[1.4fr_auto_1fr_auto] items-center gap-3 py-1.5 border-b border-[var(--line-soft)] last:border-0"
+                  className="grid grid-cols-[minmax(160px,1.4fr)_auto_minmax(140px,1fr)_auto] min-w-[520px] items-center gap-3 py-1.5 border-b border-[var(--line-soft)] last:border-0"
                 >
                   <div className="text-[13.5px] truncate">
                     {pt.pattern}
@@ -84,7 +84,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
           title="How he answers"
           hint="When a shot comes at him, what does he play back — and how do those rallies end? Predictable answers are attackable: know the reply before he hits it, and be standing where it goes."
         />
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => (
             <Card key={p} delay={(i + 1) as 1}>
               <div className="text-[13.5px] font-semibold mb-3" style={{ color: PCOLOR[p] }}>
@@ -95,7 +95,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
                   .sort((x, y) => (y.replies[0]?.pct ?? 0) - (x.replies[0]?.pct ?? 0))
                   .slice(0, 5)
                   .map((t) => (
-                    <div key={t.trigger} className="grid grid-cols-[120px_1fr] gap-3 items-start">
+                    <div key={t.trigger} className="grid grid-cols-[88px_1fr] sm:grid-cols-[120px_1fr] gap-3 items-start">
                       <div className="text-[12.5px] text-mut pt-0.5">
                         vs <b className="text-ink">{t.trigger}</b>
                         <span className="mono text-[10px] text-dim block">{t.n}×</span>
@@ -137,7 +137,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
           title="Opening playbook"
           hint="Each serve, what comes back, and who profits. A return that drops the server's win rate is the receive to drill; a serve that holds 60%+ is the one to keep trusting."
         />
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => (
             <Card key={p} delay={(i + 1) as 1}>
               <div className="text-[13.5px] font-semibold mb-3" style={{ color: PCOLOR[p] }}>
@@ -188,7 +188,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
 
       <div className="rule" />
 
-      <section className="grid lg:grid-cols-2 gap-4">
+      <section className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
         <Card>
           <Section
             kicker={`FORCED = SCRAMBLING AT ≥2.5 M/S`}

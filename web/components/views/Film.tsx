@@ -102,7 +102,7 @@ export default function Film({ d, id, src }: ViewProps) {
 
       <div className="grid lg:grid-cols-[0.95fr_1.5fr] gap-4 items-start">
         {/* rally list */}
-        <Card className="rise-1 !p-0 overflow-hidden">
+        <Card className="rise-1 !p-0 overflow-hidden min-w-0">
           <div className="px-4 py-2.5 border-b border-[var(--line-soft)] kicker">
             {filtered.length} RALLIES — SCORE IS A–B AFTER THE RALLY · ❄ CLUTCH
           </div>
@@ -141,9 +141,9 @@ export default function Film({ d, id, src }: ViewProps) {
         </Card>
 
         {/* player + replay */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           {sel && (
-            <Card className="rise-2">
+            <Card className="rise-2 min-w-0 overflow-hidden">
               <div className="flex items-baseline gap-3 flex-wrap mb-3">
                 <span className="disp text-[1.2rem] font-semibold">
                   Set {sel.set} · Rally {sel.rally}
@@ -218,7 +218,7 @@ export default function Film({ d, id, src }: ViewProps) {
           )}
 
           {sel && (
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4 [&>*]:min-w-0">
               <Card className="rise-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="kicker">2D REPLAY — CV TRACKS</span>

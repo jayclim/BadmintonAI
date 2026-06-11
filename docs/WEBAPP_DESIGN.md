@@ -115,7 +115,7 @@ was inferred from the broadcast video — no human labels".
    shot type (m/s) — the pressure builders even when they don't end points.
 
 ### 4.4 Patterns (`/patterns`)
-1. **Ending sequences** — 2-shot/3-shot toggle; each row: pattern ("lob → smash"), count,
+1. **Ending sequences** — 2-shot/3-shot toggle; each row: pattern ("lift → smash"), count,
    a split bar of who profited (player colors), watch button. Lopsided (≥75%) rows flagged.
 2. **Forced vs unforced errors** — per player stacked bar (forced amber / unforced red)
    with the ≥2.5 m/s definition stated; unforced-heavy gets "free points to claw back".

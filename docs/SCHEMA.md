@@ -34,7 +34,9 @@ ShuttleSet's labels, since they share the pixel space). 30 fps (frame_num = sec 
 18). `type` is Chinese; we map it via the official two-step dict from their
 `preprocess_data.py` (see `src/badminton/shuttleset.py`): short service, long service,
 clear, drive, drop, lob, net shot, smash, push/rush, defensive shot. `未知球種`/`小平球`
-→ unknown (kept raw in `shot_type_raw`).
+→ unknown (kept raw in `shot_type_raw`). These canonical strings are what the DB and
+all python-internal code key off; coach-facing display names (short serve, high serve,
+lift, push, block) are applied at presentation boundaries via `insights.SHOT_DISPLAY`.
 
 `player` is `A`/`B` (A = match winner); we keep A/B on import and relabel to near/far
 later via the homography (court half).

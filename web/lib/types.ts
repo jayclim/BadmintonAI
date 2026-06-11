@@ -214,8 +214,8 @@ export interface Replay {
 }
 
 export const SHOT_ORDER = [
-  "short service", "long service", "clear", "drive", "drop", "lob",
-  "net shot", "smash", "push/rush", "defensive shot",
+  "short serve", "high serve", "clear", "drive", "drop", "lift",
+  "net shot", "smash", "push", "block",
 ];
 
 export const COURT = { w: 6.1, l: 13.4, net: 6.7 };

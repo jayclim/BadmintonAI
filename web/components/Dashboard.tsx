@@ -52,18 +52,18 @@ export default function Dashboard({ id, src, view }: { id: string; src: Source; 
   return (
     <main className="max-w-[1400px] mx-auto px-5 pb-20 w-full">
       {/* ── top bar ── */}
-      <nav className="flex items-center gap-5 py-4 border-b border-[var(--line-soft)] flex-wrap sticky top-0 z-40 bg-[var(--bg)]/85 backdrop-blur-md -mx-5 px-5">
+      <nav className="flex items-center gap-4 py-3.5 border-b border-[var(--line-soft)] sticky top-0 z-40 bg-[var(--bg)]/90 backdrop-blur-md -mx-5 px-5 overflow-x-auto [scrollbar-width:none]">
         <Link href="/" className="disp font-bold text-[1.25rem] tracking-tight shrink-0">
           COURT<span style={{ color: "var(--ai)" }}>SIDE</span>
         </Link>
-        <div className="flex gap-0.5 flex-wrap">
+        <div className="flex gap-0.5 shrink-0">
           {TABS.map(([v, label]) => {
             const on = view === v;
             return (
               <Link
                 key={v}
                 href={`/m/${id}/${src}/${v}/`}
-                className="px-3 py-1.5 rounded-md text-[13.5px] transition-colors"
+                className="px-3 py-1.5 rounded-md text-[13.5px] transition-colors whitespace-nowrap"
                 style={{
                   color: on ? "var(--ink)" : "var(--mut)",
                   background: on ? "var(--panel-solid)" : "transparent",

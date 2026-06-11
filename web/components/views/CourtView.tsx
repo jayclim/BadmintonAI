@@ -61,7 +61,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
             accent="var(--warn)"
           />
         </div>
-        <div className="grid md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.9fr] gap-4">
+        <div className="grid md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.9fr] gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => {
             const m = marks(p);
             return (
@@ -97,7 +97,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
           title="Who did the running"
           hint="Per-player movement, correctly re-attributed each set as players swap ends. Heat shown on each player's own half, net at the top. Recovery = average distance from the ideal base — lower is better discipline."
         />
-        <div className="grid md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.9fr] gap-4">
+        <div className="grid md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.9fr] gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => {
             const mv = movement[p];
             if (!mv)

@@ -5,6 +5,8 @@
 -- shot_type (ShuttleSet22 canonical, 10 classes): short service, long service, clear,
 -- drive, drop, lob, net shot, smash, push/rush, defensive shot.
 -- (Original KDD ShuttleSet had 18 finer classes; ShuttleSet22 collapses them to 10.)
+-- Coach-facing display names (short serve, high serve, lift, push, block) are applied
+-- at presentation boundaries via insights.SHOT_DISPLAY — the DB keeps the canonical strings.
 --
 -- Coordinates: pipeline rows are court METRES (coord_space='court_m'); ShuttleSet
 -- imports are raw broadcast PIXELS (coord_space='pixel') — no homography is shipped,

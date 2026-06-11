@@ -35,7 +35,7 @@ export default function Points({ d, goFilm }: ViewProps) {
           title="Weapons vs leaks"
           hint="Green = outright winners hit with that shot; red = points thrown away with it. The biggest red bar is the cheapest place to improve. Click a bar to watch those rallies."
         />
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => {
             const mine = insights.shotOutcomes
               .filter((o) => o.p === p)
@@ -72,7 +72,7 @@ export default function Points({ d, goFilm }: ViewProps) {
 
       <div className="rule" />
 
-      <section className="grid lg:grid-cols-5 gap-4">
+      <section className="grid lg:grid-cols-5 gap-4 [&>*]:min-w-0">
         <Card className="lg:col-span-3">
           <Section
             kicker="PATIENCE VS FIRST STRIKE"
@@ -109,7 +109,7 @@ export default function Points({ d, goFilm }: ViewProps) {
 
       <div className="rule" />
 
-      <section className="grid lg:grid-cols-3 gap-4">
+      <section className="grid lg:grid-cols-3 gap-4 [&>*]:min-w-0">
         {(["B", "A"] as P[]).map((p, i) => {
           const s = sv[p];
           const types = Object.entries(s.by_type).sort(

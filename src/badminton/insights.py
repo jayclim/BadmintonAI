@@ -22,6 +22,8 @@ Conventions
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -34,8 +36,40 @@ CLUTCH_FROM = 18             # a rally is "clutch" once either player has >= thi
 # rally-ending error classification from ShuttleSet lose_reason (Chinese)
 _END_CAT = {"出界": "Out", "掛網": "Net", "未過網": "Net", "落點判斷失誤": "Misjudged"}
 
+# Canonical class strings as stored in the DB (ShuttleSet import + pipeline rows
+# + shotclass.CLASSES all key off these — do NOT rename here).
 SHOT_ORDER = ["short service", "long service", "clear", "drive", "drop", "lob",
               "net shot", "smash", "push/rush", "defensive shot"]
+
+# Coach-facing display names (modern terminology), applied at presentation
+# boundaries (export_web) — internal data keeps the canonical strings above.
+SHOT_DISPLAY = {"short service": "short serve", "long service": "high serve",
+                "lob": "lift", "push/rush": "push", "defensive shot": "block"}
+
+# prose variant (plural forms too) + helpers for the presentation boundaries
+SHOT_DISPLAY_PROSE = {**SHOT_DISPLAY,
+                      "lobs": "lifts", "defensive shots": "blocks",
+                      "push/rushes": "pushes",
+                      "short services": "short serves", "long services": "high serves"}
+_DISP_RE = re.compile(r"\b(?:%s)\b" % "|".join(
+    re.escape(k) for k in sorted(SHOT_DISPLAY_PROSE, key=len, reverse=True)))
+
+
+def shot_display_text(s: str) -> str:
+    """Canonical class names -> display terms inside a sentence (word-boundaried,
+    so e.g. 'global' or 'service points' are untouched)."""
+    return _DISP_RE.sub(lambda m: SHOT_DISPLAY_PROSE[m.group(0)], s)
+
+
+def shot_display_deep(o, rename_keys: bool = False):
+    """shot_display_text over every string in a nested structure; rename_keys also
+    rewrites dict keys (LLM dossier — shot names appear as keys there)."""
+    if isinstance(o, dict):
+        return {(shot_display_text(k) if rename_keys and isinstance(k, str) else k):
+                shot_display_deep(v, rename_keys) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [shot_display_deep(v, rename_keys) for v in o]
+    return shot_display_text(o) if isinstance(o, str) else o
 
 
 def other(p: str) -> str:

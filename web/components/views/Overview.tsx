@@ -49,7 +49,7 @@ export default function Overview({ d, src, goFilm, goRally }: ViewProps) {
                   </span>
                   {meta.winner === p && <span className="text-[13px]">🏆</span>}
                 </div>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                   <Metric label="POINTS" value={pw[p].points} />
                   <Metric label="WINNERS" value={pw[p].winners} accent="var(--win)" />
                   <Metric label="ERRORS" value={errs} accent="var(--err)" />

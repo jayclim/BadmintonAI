@@ -107,7 +107,7 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 | `validate.py` | compare our tracks vs ShuttleSet labels → median error (m) |
 | `analytics.py` | movement metrics: `player_metrics`, `summary`, `rallies`, `match_aggregate` |
 | `tactics.py` | `shot_outcomes`, `pressure_*`, `pressure_by_shot`, `rally_patterns`, `rally_detail` |
-| `insights.py` | coach-facing derived data: `stroke_df`/`rally_df` (court-metre + normalized coords, winner from score deltas), `side_map` (per-set near/far↔A/B), placement/serve/clutch/pattern/error-pressure stats, `movement_by_player` (side-swap aware), `coach_notes` (rule-based insight cards w/ supporting rally keys) |
+| `insights.py` | coach-facing derived data: `stroke_df`/`rally_df` (court-metre + normalized coords, winner from score deltas), `side_map` (per-set near/far↔A/B), placement/serve/clutch/pattern/error-pressure stats, `movement_by_player` (side-swap aware), `coach_notes` (rule-based insight cards w/ supporting rally keys). `SHOT_ORDER` = the 10 canonical DB class strings (do NOT rename); `SHOT_DISPLAY` maps them to coach-facing terms (lob→lift, short/long service→short/high serve, push/rush→push, defensive shot→block), applied only at presentation boundaries (export_web `_disp*`). |
 | `commentary.py` | LLM tactical match report: `build_dossier` (~6 KB JSON from insights/tactics, real names) → provider-pluggable `generate` (gemini = REST + JSON mode, claude = `messages.parse` structured output; both pydantic-validated) → cached at `data/commentary/<id>.<provider>.json`. Keys in repo-root `.env` (gitignored): `GEMINI_API_KEY` (default provider, free tier; `GEMINI_MODEL` overrides gemini-2.5-flash) / `ANTHROPIC_API_KEY`. CLI: `python -m badminton.commentary <id> [--provider g\|c] [--force\|--dossier-only]`. |
 | `clip.py` | `list_rallies`, `clip_rally` (raw), `annotated_rally` (detect+render, skips detect if parsed), `reason_en` |
 | `render_overlay.py` | annotated overlay video (boxes + pose skeletons + minimap + SS labels) |
@@ -130,10 +130,10 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 - Movement: Lakshya ran **~1,831 m**, Loh **~1,782 m** over ~912 s rally time.
   (Earlier "1,928 vs 1,685" figures were keyed by raw near/far and MIXED the players —
   see gotcha 7. The side-swap-corrected numbers come from `insights.movement_by_player`.)
-- Tactics: smash wins most points (12); defensive shot (12) & lob (11) cause most errors.
-  `lob → smash` is the top winning pattern; `smash → defensive shot` the top losing one.
+- Tactics: smash wins most points (12); block (12) & lift (11) cause most errors.
+  `lift → smash` is the top winning pattern; `smash → block` the top losing one.
 - Pressure (required speed to reach a shot): Loh applied slightly more (2.42 vs 2.31 m/s)
-  but lost on errors. A *defensive shot* makes the opponent cover the most ground (3.34).
+  but lost on errors. A *block* makes the opponent cover the most ground (3.34).
 
 ## 8. CRITICAL GOTCHAS (these cost real time — don't relearn them)
 1. **DuckDB concurrency:** one read-write (exclusive) OR many read-only (shared) across

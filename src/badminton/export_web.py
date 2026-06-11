@@ -61,6 +61,25 @@ def _yt_id(url: str) -> str | None:
     return m.group(1) if m else None
 
 
+# Canonical DB class -> coach-facing display term. The web app ONLY sees display
+# terms; everything python-internal stays canonical (see insights.SHOT_DISPLAY).
+def _disp(shot: str | None) -> str | None:
+    if not isinstance(shot, str):   # None or pandas NaN (a float)
+        return None
+    return insights.SHOT_DISPLAY.get(shot, shot)
+
+
+def _disp_seq(pattern: str | None) -> str | None:
+    if not isinstance(pattern, str):   # None or pandas NaN (a float)
+        return None
+    return " → ".join(_disp(t) for t in pattern.split(" → "))
+
+
+# renaming inside generated sentences (notes, phrases) + nested cached commentary
+_disp_text = insights.shot_display_text
+_disp_deep = insights.shot_display_deep
+
+
 def _end_phrase(r, source: str) -> str:
     if r["category"] == "Winner":
         return f"{r['end_shot']} winner"
@@ -140,22 +159,22 @@ def export_source(match_id: str, source: str, out: Path) -> dict:
             set=int(r["set_no"]), rally=int(r["rally_id"]), f0=f0v, f1=f1v,
             t0=round(f0v / fps, 2), t1=round(f1v / fps, 2),
             shots=int(r["shots"]), durS=float(r["duration_s"]),
-            server=r["server"], serveType=r["serve_type"],
+            server=r["server"], serveType=_disp(r["serve_type"]),
             winner=r["winner"] if r["winner"] in ("A", "B") else None,
-            endHitter=r["end_hitter"], endShot=r["end_shot"],
+            endHitter=r["end_hitter"], endShot=_disp(r["end_shot"]),
             endRound=int(r["end_round"]), category=r["category"],
-            endPhrase=_end_phrase(r, source),
+            endPhrase=_disp_text(_end_phrase(r, source)),
             a=int(r["score_a"]), b=int(r["score_b"]),
             pa=int(r["prev_a"]), pb=int(r["prev_b"]),
             clutch=bool(r["clutch"]), bucket=r["bucket"],
-            pat2=r["pat2"], pat3=r["pat3"]))
+            pat2=_disp_seq(r["pat2"]), pat3=_disp_seq(r["pat3"])))
 
     strokes = []
     for _, s in sdf.iterrows():
         fv = int(s["frame_num"]) + off
         strokes.append(dict(
             set=int(s["set_no"]), rally=int(s["rally_id"]), br=int(s["ball_round"]),
-            f=fv, t=round(fv / fps, 2), p=s["hitter"], shot=s["shot"],
+            f=fv, t=round(fv / fps, 2), p=s["hitter"], shot=_disp(s["shot"]),
             conf=round(float(s["shot_type_conf"]), 2) if "shot_type_conf" in s and pd.notna(s.get("shot_type_conf")) else None,
             hx=s["hitter_mx"], hy=s["hitter_my"],
             lx=s["land_mx"], ly=s["land_my"],
@@ -193,8 +212,8 @@ def export_source(match_id: str, source: str, out: Path) -> dict:
                     continue
                 top = sorted(replies.items(), key=lambda kv: -kv[1][0])[:3]
                 trig.append(dict(
-                    trigger=shot, n=total,
-                    replies=[dict(shot=s, n=v[0], pct=round(100 * v[0] / total),
+                    trigger=_disp(shot), n=total,
+                    replies=[dict(shot=_disp(s), n=v[0], pct=round(100 * v[0] / total),
                                   winPct=round(100 * v[1] / v[2]) if v[2] >= 4 else None)
                              for s, v in top]))
             trig.sort(key=lambda t: -t["n"])
@@ -226,9 +245,10 @@ def export_source(match_id: str, source: str, out: Path) -> dict:
                         e[2] += 1
                         e[1] += int(won == srv)
         for p in ("A", "B"):
+            out[p] = {_disp(st): d for st, d in out[p].items()}
             for st, d in out[p].items():
                 top = sorted(d["returns"].items(), key=lambda kv: -kv[1][0])[:3]
-                d["returns"] = [dict(shot=s, n=v[0],
+                d["returns"] = [dict(shot=_disp(s), n=v[0],
                                      pct=round(100 * v[0] / max(1, d["n"])),
                                      srvWinPct=round(100 * v[1] / v[2]) if v[2] >= 4 else None)
                                 for s, v in top]
@@ -244,30 +264,35 @@ def export_source(match_id: str, source: str, out: Path) -> dict:
            .groupby(["hitter", "shot"]).size().rename("n").reset_index())
     mix["pct"] = mix.groupby("hitter")["n"].transform(lambda x: 100 * x / x.sum()).round(1)
     bundle = dict(
-        notes=[dict(icon=n["icon"], title=n["title"], body=n["body"],
+        notes=[dict(icon=n["icon"], title=_disp_text(n["title"]),
+                    body=_disp_text(n["body"]),
                     keys=[[int(a), int(b)] for a, b in sorted(set(n["keys"]))])
                for n in notes[:8]],
         pointsWon=insights.points_won(rdf),
         lengthBuckets=insights.length_buckets(rdf).to_dict("records"),
-        serveStats=sv,
+        serveStats={p: {**v, "by_type": {_disp(t): g for t, g in v["by_type"].items()}}
+                    for p, v in sv.items()},
         clutch=insights.clutch_stats(rdf),
         longestRun=insights.longest_run(rdf),
-        patterns2=[{**p, "keys": [[int(a), int(b)] for a, b in p["keys"]]}
+        patterns2=[{**p, "pattern": _disp_seq(p["pattern"]),
+                    "keys": [[int(a), int(b)] for a, b in p["keys"]]}
                    for p in insights.patterns(rdf, 2, min_count=3)[:9]],
-        patterns3=[{**p, "keys": [[int(a), int(b)] for a, b in p["keys"]]}
+        patterns3=[{**p, "pattern": _disp_seq(p["pattern"]),
+                    "keys": [[int(a), int(b)] for a, b in p["keys"]]}
                    for p in insights.patterns(rdf, 3, min_count=3)[:9]],
         errorPressure=insights.error_pressure(match_id, rdf,
                                               pressure=pressure if source == "ai" else None),
         backhand=insights.backhand_stats(sdf, rdf) if source == "labels" else None,
-        shotOutcomes=[dict(p=r["player"], shot=r["shot"], w=int(r["winners"]),
+        shotOutcomes=[dict(p=r["player"], shot=_disp(r["shot"]), w=int(r["winners"]),
                            e=int(r["errors"])) for _, r in oc.iterrows()
                       if r["shot"] in insights.SHOT_ORDER],
-        shotMix=[dict(p=r["hitter"], shot=r["shot"], n=int(r["n"]), pct=float(r["pct"]))
+        shotMix=[dict(p=r["hitter"], shot=_disp(r["shot"]), n=int(r["n"]), pct=float(r["pct"]))
                  for _, r in mix.iterrows() if r["hitter"] in ("A", "B")],
         responseMatrix=response_matrix(),
         openings=openings(),
-        pressureByShot=(tactics.pressure_by_shot(match_id) if source == "labels"
-                        else labelfree.pressure_by_shot(sdf, fps)),
+        pressureByShot={_disp_text(k): v for k, v in
+                        (tactics.pressure_by_shot(match_id) if source == "labels"
+                         else labelfree.pressure_by_shot(sdf, fps)).items()},
         pressureSummary=(tactics.pressure_summary(match_id) if source == "labels"
                          else labelfree.pressure_summary(sdf, fps)),
     )
@@ -309,7 +334,7 @@ def _commentary(match_id: str):
     if not cands:
         return None
     rec = json.loads(cands[-1].read_text())
-    return dict(commentary=rec["commentary"], model=rec.get("model"),
+    return dict(commentary=_disp_deep(rec["commentary"]), model=rec.get("model"),
                 provider=rec.get("provider"), generatedAt=rec.get("generated_at"))
 
 
@@ -345,7 +370,7 @@ def _export_replays(match_id, source, sdf, rdf, smap, off, fps, out: Path):
         hits_l, arcs = [], []
         for _, s in g.iterrows():
             fv = int(s["frame_num"]) + off
-            hits_l.append(dict(f=fv, p=s["hitter"], shot=s["shot"],
+            hits_l.append(dict(f=fv, p=s["hitter"], shot=_disp(s["shot"]),
                                conf=(round(float(s["shot_type_conf"]), 2)
                                      if "shot_type_conf" in s and pd.notna(s.get("shot_type_conf")) else None)))
             if pd.notna(s["hitter_mx"]) and pd.notna(s["land_mx"]):
@@ -361,7 +386,7 @@ def _export_replays(match_id, source, sdf, rdf, smap, off, fps, out: Path):
         ref = []
         if lab is not None:
             lg = lab[(lab["frame_num"] + sh_off >= f0) & (lab["frame_num"] + sh_off <= f1)]
-            ref = [dict(f=int(x["frame_num"]) + sh_off, shot=x["shot"])
+            ref = [dict(f=int(x["frame_num"]) + sh_off, shot=_disp(x["shot"]))
                    for _, x in lg.iterrows()]
 
         payload = dict(fps=fps, f0=f0, f1=f1,
@@ -450,8 +475,9 @@ def _agreement(match_id: str) -> dict:
         hitterAcc=round(hit_ok / n_match, 4) if n_match else None,
         shotAcc=round(shot_ok / shot_n, 4) if shot_n else None,
         e2e=round(shot_ok / len(sdf), 4),
-        confusion=[dict(label=l, pred=p, n=n) for (l, p), n in sorted(conf.items())],
-        recall=[dict(shot=l, recall=round(ok / tot, 3), n=tot)
+        confusion=[dict(label=_disp(l), pred=_disp(p), n=n)
+                   for (l, p), n in sorted(conf.items())],
+        recall=[dict(shot=_disp(l), recall=round(ok / tot, 3), n=tot)
                 for l, (ok, tot) in sorted(rec.items())])
 
 

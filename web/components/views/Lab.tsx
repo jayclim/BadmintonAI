@@ -121,7 +121,7 @@ export default function Lab({ d, id, src }: ViewProps) {
             options={rallies.map((r) => `${r.set}-${r.rally}`)}
           />
         </div>
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           <Card className="rise-1">
             <div className="kicker mb-2">FOOTAGE — TOGGLE “AI OVERLAY” IN THE NAVBAR FOR THE FULLY ANNOTATED FEED</div>
             {sel && <RallyVideo rally={sel} youtubeId={meta.youtubeId} />}
@@ -169,17 +169,17 @@ export default function Lab({ d, id, src }: ViewProps) {
             title="Score OCR, live"
             hint="The BWF overlay digits are ~12 px — too small for OCR engines, so digit templates are matched directly (bootstrapped once from a labeled match; they transfer across tournaments). The machine reads the score after every rally, which yields winners, set boundaries AND which side each player is on."
           />
-          <div className="grid lg:grid-cols-[0.9fr_1.4fr] gap-4">
+          <div className="grid lg:grid-cols-[0.9fr_1.4fr] gap-4 [&>*]:min-w-0">
             <Card className="rise-1">
               <div className="kicker mb-3">SCOREBOARD CROPS + MACHINE READING</div>
               <div className="space-y-2.5">
                 {sc.ocr.crops.map((c) => (
-                  <div key={c.frame} className="flex items-center gap-3">
+                  <div key={c.frame} className="flex items-center gap-3 flex-wrap">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/data/${id}/${c.img}`}
                       alt={`scoreboard at frame ${c.frame}`}
-                      className="rounded border border-[var(--line)] w-[230px]"
+                      className="rounded border border-[var(--line)] w-[230px] max-w-full"
                     />
                     <div className="mono text-[12px]">
                       <div style={{ color: "var(--ai)" }}>
@@ -237,7 +237,7 @@ export default function Lab({ d, id, src }: ViewProps) {
                 sub="coverage × shot agreement" accent="var(--ai)" />
             </Card>
           </div>
-          <div className="grid lg:grid-cols-2 gap-4">
+          <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
             <Card>
               <div className="kicker mb-2">CONFUSION — WHERE THE AI DISAGREES</div>
               <Confusion cells={sc.agreement.confusion} order={SHOT_ORDER} />
@@ -252,9 +252,9 @@ export default function Lab({ d, id, src }: ViewProps) {
                 format={(v) => `${(v * 100).toFixed(0)}%`}
               />
               <p className="text-dim text-[12px] mt-4 leading-snug">
-                Drives and push/rushes look alike from geometry alone — that&apos;s why the chain
+                Drives and pushes look alike from geometry alone — that&apos;s why the chain
                 uses BST&apos;s pose transformer at each detected contact. Smashes off a descending
-                lob have no 2D direction change; the |Δv| detector was built for exactly that.
+                lift have no 2D direction change; the |Δv| detector was built for exactly that.
               </p>
             </Card>
           </div>

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import Dashboard from "@/components/Dashboard";
 import type { IndexData, Source } from "@/lib/types";
 
-export const VIEWS = ["overview", "points", "court", "patterns", "film", "lab"] as const;
+const VIEWS = ["overview", "points", "court", "patterns", "film", "lab"] as const;
 
 export function generateStaticParams() {
   const p = path.join(process.cwd(), "public", "data", "index.json");

@@ -58,7 +58,7 @@ on them, reconcile them with the numbers, and go deeper; don't just restate them
 - Court positions and distances come from validated CV tracking (median error ~0.6 m).
 
 Write like a coach talking to coaches: concrete, evidence-cited (use the actual \
-numbers), tactically specific, no fluff. Prefer "his cross-court defensive lob under \
+numbers), tactically specific, no fluff. Prefer "his cross-court defensive lift under \
 pressure" over "his defense". Every claim must be supported by a number in the dossier. \
 Do not invent events (specific rallies, shouts, crowd, injuries) that are not in the data."""
 
@@ -175,7 +175,8 @@ def build_dossier(match_id: str) -> dict:
     notes = insights.coach_notes(match_id, rdf, sdf, names)
     flags = [{"title": n["title"], "detail": n["body"]} for n in notes[:8]]
 
-    return _plain({
+    # the LLM sees coach-facing display terms, not the canonical DB class strings
+    return insights.shot_display_deep(_plain({
         "match": {
             "players": [names["B"], names["A"]],
             "winner": names["A"],
@@ -199,7 +200,7 @@ def build_dossier(match_id: str) -> dict:
         "opponent_scramble_speed_by_shot_type": tactics.pressure_by_shot(match_id),
         "movement_from_cv_tracks": movement,
         "rule_based_flags": flags,
-    })
+    }), rename_keys=True)
 
 
 # ---------------------------------------------------------------- providers
