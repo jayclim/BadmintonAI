@@ -1,54 +1,139 @@
-# Badminton CV — Match Tracker & Tactical Analytics
+# COURTSIDE — badminton match intelligence from raw broadcast video
 
-Computer-vision + AI system that turns badminton video into structured tactical data,
-then into a coaching analytics dashboard and (later) natural-language advice.
+**An end-to-end computer-vision system that watches a badminton broadcast and writes the
+scouting report.** It tracks both players and the shuttle, detects every hit, classifies
+every shot, reads the scoreboard, segments rallies — then turns that into a coach-grade
+analytics dashboard with AI-annotated video for every rally. **No human labels at
+inference time**, and every stage is validated against professionally annotated ground
+truth, including on a fully held-out match.
 
-> **Picking this up?** Read [`HANDOFF.md`](HANDOFF.md) first — it's the single entry point
-> (status, architecture, run commands, and the hard-won gotchas).
+![COURTSIDE overview — label-free AI mode](docs/img/web_overview.jpg)
 
-## Status: Phase 0 validated (0.566 m) · full match parsed · Phase 1 analytics in dashboard
+> The banner is the point: everything on that page — the score worm, the stats, the
+> coach's notes — was inferred from pixels. Flip the same dashboard to **GROUND TRUTH**
+> (human labels) and compare; the gap between the two toggles is measured and published
+> on the AI Lab page.
 
-## Direction
-- **Capture:** start from broadcast feeds; design toward *user-controlled capture*
-  (anyone sets up one good-enough camera). Controlled capture makes court calibration
-  a one-time step.
-- **Product order:** analytics dashboard first → tactical commentary/advice later.
-- **Discipline order:** singles first → doubles later.
+## The pipeline, with honest numbers
+
+Thresholds were tuned on one match (India Open 2022 final) and tested untouched on a
+second (Denmark Open 2022 SF) — the held-out column is true out-of-distribution
+performance. Ground truth: ShuttleSet22 human annotations.
+
+| Stage | Method | Tuned match | Held-out match |
+|---|---|---|---|
+| Player tracking → court metres | YOLO11x-pose + ByteTrack + homography | **0.57 m** median (1,058 strokes) | 0.64 m |
+| Shuttle tracking | TrackNetV3 (vendored, MPS-patched) | **99.8%** of labeled hit points | — |
+| Hit detection | velocity-kink ∪ direction-reversal ∪ serve-onset detectors | **F1 87.9** | F1 85.8 |
+| Hitter attribution | nearest tracked wrist | **90.0%** | 94.5% |
+| Landing position | trajectory floor point → homography | **0.55 m** median | 1.12 m |
+| Shot classification (10 classes) | pretrained BST-0 (CVPRW'26) at *detected* hits, zero fine-tuning | **72.5%** | 83.4% |
+| Rally segmentation | camera-run detection + dead-shuttle restart splitting | **F1 97.6** | F1 94.0 |
+| Score OCR | template-matched 12 px digits (self-bootstrapped from labels, transfers across tournaments) | **95.2%** score trajectory | 97.3% |
+| Per-set side mapping | "winner serves next" voting | **4/4** sets | 4/4 sets |
+
+End-to-end, the label-free chain reproduces 84.5% / 79.5% of labeled strokes with ~96%
+hitter agreement — enough that the *same* analytics code produces near-identical coach
+insights from either source.
+
+## What the dashboard does with it
+
+Static Next.js app in [`web/`](web/) (TypeScript, Tailwind, bespoke SVG charts — no chart
+library; deploys to Vercel as pure static files):
+
+- **Overview** — interactive score worm, stat duel, auto-generated *coach's notes* where
+  every claim deep-links to its evidence rallies, plus an LLM-written match report.
+- **Points / Court / Patterns** — weapons-vs-leaks, rally-length win rates, serve & receive,
+  shot placement maps, movement heatmaps (side-swap corrected), pressure model
+  (required movement speed), forced/unforced errors, and two scouting tables:
+  the **response matrix** ("vs a net shot he lifts 52% — and wins only 41% of those")
+  and the **opening playbook** (serve type → hold % → returns → server win % vs each).
+- **Film room** — every rally filterable and watchable, with a synchronized **2D replay**
+  animated from the CV tracks and a per-shot pressure strip.
+- **AI overlay everywhere** — a persistent navbar toggle swaps all footage to
+  pre-rendered annotated clips: pose skeletons, shuttle trail, BST shot calls with
+  confidence, and the machine-read score, baked into the video.
+- **AI Lab** — the showcase page: each pipeline stage with its measured accuracy, a rally
+  "X-ray" (broadcast + 2D replay + raw shuttle trajectory with detected vs labeled hits),
+  live score-OCR crops, and the BST-vs-labels confusion matrix.
+
+![AI Lab — agreement vs human labels](docs/img/web_lab.jpg)
+![Film room — AI-annotated rally clip](docs/img/web_film.jpg)
+
+## Run it
+
+**Web dashboard** (all data + clips are committed — runs from a fresh clone):
+
+```bash
+cd web && npm install && npm run dev     # http://localhost:3000
+npm run build                            # static site in web/out — Vercel: root dir = web
+```
+
+**Python pipeline / Streamlit lab** (needs the local DuckDB + match video — see the
+runbook below to build them):
+
+```bash
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
+PYTHONPATH=src .venv/bin/streamlit run app.py        # internal CV-diagnostics dashboard
+PYTHONPATH=src .venv/bin/python -m badminton.<module>  # any pipeline stage as a CLI
+```
+
+**Add a match (data injection)** — the full runbook with both paths is
+[`docs/ADD_A_MATCH.md`](docs/ADD_A_MATCH.md). The short version, for any broadcast video
+with no labels:
+
+```bash
+# register in config/matches.yaml, fetch 720p video, calibrate 4 court corners, then:
+PYTHONPATH=src .venv/bin/python scripts/parse_match.py --match <id> ...   # player tracks
+PYTHONPATH=src .venv/bin/python -m badminton.shuttle <id>                 # shuttle track
+PYTHONPATH=src .venv/bin/python -m badminton.pipeline <id> --label-free --write
+PYTHONPATH=src .venv/bin/python -m badminton.labelfree <id> --build       # score OCR
+PYTHONPATH=src .venv/bin/python scripts/render_web_clips.py --match <id>  # AI clips
+PYTHONPATH=src .venv/bin/python -m badminton.export_web                   # → web/public/data
+```
+
+Parsed data is durable (DuckDB, keyed by `match_id`) — every stage runs once and is
+cached forever.
+
+## How it's built
+
+```
+broadcast.mp4 ──► YOLO11 pose + ByteTrack ──► tracks (court metres, validated ±0.57 m)
+       │                                          │
+       └──► TrackNetV3 ──► shuttle track ──► hit detection ──► BST-0 shot classes
+                                │                 │
+                       rally segmentation   landings (floor-point → homography)
+                                │                 │
+       score OCR ──► winners · sets · sides       │
+                                └────────┬────────┘
+                                  strokes table (= ShuttleSet schema, source='pipeline')
+                                         │
+                    insights.py / labelfree.py (pure pandas analytics)
+                                         │
+                         export_web.py ──► static JSON ──► web/ (Next.js)
+```
+
+The design bet that paid off: **ShuttleSet's annotation format is the system's Tier-1
+schema.** The CV pipeline's job is defined as *reproducing the human annotators' table* —
+which gives free per-stage validation, and means the entire analytics layer was built and
+debugged on ground truth before the vision pipeline existed.
+
+- **Storage** — DuckDB, two tiers: `strokes` (one row per shot, superset of ShuttleSet) and
+  `tracks`/`shuttle` (per-frame). One writer or many readers; writers batch at the end.
+- **Stack** — Python 3.12 / PyTorch on Apple-silicon MPS, ultralytics, DuckDB, pandas,
+  scikit-learn, OpenCV · Next.js 16 / TypeScript / Tailwind 4 · Gemini or Claude for the
+  commentary layer (cached JSON, pluggable provider).
+- **Video strategy** — analyzed videos are the official BWF YouTube uploads, so the web app
+  embeds them at frame-accurate timestamps (zero hosting); the AI-annotated clips are
+  rendered locally at 540p (~0.7 MB/rally) and shipped with the site.
 
 ## Docs
-- [`docs/DESIGN.md`](docs/DESIGN.md) — architecture, tooling choices (with trade-offs), phased plan.
-- [`docs/SCHEMA.md`](docs/SCHEMA.md) — the two-tier data model, built as a superset of ShuttleSet.
-- [`schema/schema.sql`](schema/schema.sql) — DuckDB DDL, ready to run.
-- [`docs/DATASETS.md`](docs/DATASETS.md) — existing annotated datasets and how to access them.
 
-## Data persistence & multiple matches
-**Parsed data is durable** — every stroke and track is stored in `data/db/badminton.duckdb`
-on disk, keyed by `match_id`. It survives across sessions, so **you parse a match once**
-and the dashboard just reads it. (The DB is gitignored; it's a local cache, not committed.)
-
-The dashboard has a **Match selector** (sidebar) populated from the DB, so multiple matches
-coexist and are pickable. To add a new match:
-1. Register it in `config/matches.yaml` (players, video_url, etc.).
-2. `python -m badminton.shuttleset <match_id>` — import its ShuttleSet labels.
-3. `python -m badminton.fetch_video <match_id> --url ...` then `calibrate_court` — get the homography.
-4. `python scripts/parse_match.py --match <match_id>` — parse it once (cached forever after).
-
-## Viewing results
-- **Coaching dashboard:** `PYTHONPATH=src .venv/bin/streamlit run app.py` — seven pages:
-  Match story (score worm + auto Coach's notes that deep-link to the supporting rally
-  clips), Commentary (LLM tactical match report — Gemini or Claude, key in the
-  repo-root `.env`, cached per provider after first generation), Points won & lost, Court maps
-  (shot placement + movement), Patterns & pressure, Film room (filterable rally clips
-  with rally map + per-shot pressure), and Lab (CV validation diagnostics;
-  see [`docs/PHASE0_RESULTS.md`](docs/PHASE0_RESULTS.md)).
-- **Annotated overlay video:** `data/raw/overlay.mp4` — player boxes + foot-dots, live
-  top-down minimap, ShuttleSet labels overlaid. Re-render any window:
-  `python -m badminton.detect <match> --start-frame F --max-frames N` then
-  `python -m badminton.render_overlay <match> --start F --end F+N`.
-
-## The key insight driving everything
-**ShuttleSet** (36,492 labeled pro strokes with player positions) is effectively our
-Tier-1 events table already. So: build the analytics/commentary layer on ShuttleSet
-*now*, and make the CV pipeline's job to *reproduce ShuttleSet's exact format*. That
-gives free validation, model portability, and a commentary layer that works before the
-vision pipeline exists.
+| Doc | Contents |
+|---|---|
+| [`HANDOFF.md`](HANDOFF.md) | single entry point: status, module map, the hard-won gotchas |
+| [`docs/ADD_A_MATCH.md`](docs/ADD_A_MATCH.md) | runbook: inject a new match (labeled or label-free) |
+| [`docs/DESIGN.md`](docs/DESIGN.md) · [`docs/SCHEMA.md`](docs/SCHEMA.md) | architecture & the two-tier data model |
+| [`docs/PHASE0_RESULTS.md`](docs/PHASE0_RESULTS.md) | tracking validation methodology + results |
+| [`docs/WEBAPP_DESIGN.md`](docs/WEBAPP_DESIGN.md) | every dashboard view & component, design rationale |
+| [`docs/DATASETS.md`](docs/DATASETS.md) | ShuttleSet & friends, how to access |
