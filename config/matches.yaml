@@ -68,3 +68,16 @@ denmark_open_2022_sf:
   - 0.004307835473704193
   - 1.0
   ss_shuttle_offset: -3
+all_england_2022_sf:
+  match_id: all_england_2022_sf
+  discipline: singles
+  tournament: YONEX All England Open 2022
+  round: Semi-finals
+  match_date: '2022-03-19'
+  players:
+  - Lee Zii Jia
+  - Lakshya Sen
+  shuttleset_dir: Lakshya_SEN_LEE_Zii_Jia_All_England_Open_2022_SemiFinals
+  video_url: https://www.youtube.com/watch?v=hCk_QUZdo_0
+  video_path: data/raw/all_england_2022_sf.mp4
+  fps: 30.0

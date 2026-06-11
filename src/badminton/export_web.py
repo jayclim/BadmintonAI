@@ -99,19 +99,21 @@ def _end_phrase(r, source: str) -> str:
 # ------------------------------------------------------------------ per-source data
 
 def _source_frames(match_id: str, source: str):
-    """(sdf, rdf, smap, pressure list, frame->video offset)."""
+    """(sdf, rdf, per-set smap, per-RALLY rmap, pressure list, frame offset)."""
     if source == "labels":
         sdf = insights.stroke_df(match_id)
         rdf = insights.rally_df(match_id, sdf)
         smap = insights.side_map_from(sdf)
+        rmap = insights.rally_side_map(sdf)
         pressure = tactics.pressure_strokes(match_id)
-        return sdf, rdf, smap, pressure, SS_OFFSET
+        return sdf, rdf, smap, rmap, pressure, SS_OFFSET
     sdf = labelfree.stroke_df(match_id)
     rdf = labelfree.rally_df(match_id, sdf)
     smap = labelfree.side_map(match_id)
+    rmap = labelfree.rally_side_map(match_id)
     fps = float(config.get_match(match_id)["fps"])
     pressure = labelfree.pressure_strokes(sdf, fps)
-    return sdf, rdf, smap, pressure, 0
+    return sdf, rdf, smap, rmap, pressure, 0
 
 
 def _heat(P: np.ndarray) -> dict:
@@ -135,7 +137,7 @@ def _clip_windows(match_id: str) -> list[tuple[int, int, str]]:
 def export_source(match_id: str, source: str, out: Path) -> dict:
     m = config.get_match(match_id)
     fps = float(m["fps"])
-    sdf, rdf, smap, pressure, off = _source_frames(match_id, source)
+    sdf, rdf, smap, rmap, pressure, off = _source_frames(match_id, source)
     names = {"A": m["players"][1], "B": m["players"][0]}
 
     req = {(x["set"], x["rally"], x["shot_no"]): round(x["req_speed"], 2)
@@ -298,7 +300,7 @@ def export_source(match_id: str, source: str, out: Path) -> dict:
     )
 
     mov = (insights.movement_by_player(match_id) if source == "labels"
-           else labelfree.movement_by_player(match_id, rdf, smap))
+           else labelfree.movement_by_player(match_id, rdf, rmap))
     movement = {}
     for p, mt in mov.items():
         movement[p] = dict(distM=mt["distance_m"], secs=mt["rally_time_s"],
@@ -324,7 +326,7 @@ def export_source(match_id: str, source: str, out: Path) -> dict:
         commentary=_commentary(match_id))
     _write(out / match_id / f"{source}.json", data)
 
-    _export_replays(match_id, source, sdf, rdf, smap, off, fps, out)
+    _export_replays(match_id, source, sdf, rdf, rmap, off, fps, out)
     return data
 
 
@@ -340,7 +342,7 @@ def _commentary(match_id: str):
 
 # ------------------------------------------------------------------ replay payloads
 
-def _export_replays(match_id, source, sdf, rdf, smap, off, fps, out: Path):
+def _export_replays(match_id, source, sdf, rdf, rmap, off, fps, out: Path):
     con = db.connect(read_only=True)
     sh_off = hits.shuttle_offset(match_id)
     lab = None
@@ -390,7 +392,7 @@ def _export_replays(match_id, source, sdf, rdf, smap, off, fps, out: Path):
                    for _, x in lg.iterrows()]
 
         payload = dict(fps=fps, f0=f0, f1=f1,
-                       smap={p: smap.get((sn, p)) for p in ("A", "B")},
+                       smap=rmap.get((sn, rid), {"A": None, "B": None}),
                        near=players["near"], far=players["far"],
                        shuttle=[[int(f), round(float(x), 1), round(float(y), 1)]
                                 for f, x, y in sh],

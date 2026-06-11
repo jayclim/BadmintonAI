@@ -5,6 +5,7 @@
   "1": "far",
   "2": "near"
  },
+ "flips": {},
  "rallies": [
   {
    "rally_key": 1,
@@ -16,7 +17,8 @@
    "score_b": 1,
    "rally_id": 1,
    "prev_a": 0,
-   "prev_b": 0
+   "prev_b": 0,
+   "side_a": "far"
   },
   {
    "rally_key": 2,
@@ -28,7 +30,8 @@
    "score_b": 2,
    "rally_id": 2,
    "prev_a": 0,
-   "prev_b": 1
+   "prev_b": 1,
+   "side_a": "far"
   },
   {
    "rally_key": 3,
@@ -40,7 +43,8 @@
    "score_b": 2,
    "rally_id": 3,
    "prev_a": 0,
-   "prev_b": 2
+   "prev_b": 2,
+   "side_a": "far"
   },
   {
    "rally_key": 4,
@@ -52,7 +56,8 @@
    "score_b": 2,
    "rally_id": 4,
    "prev_a": 1,
-   "prev_b": 2
+   "prev_b": 2,
+   "side_a": "far"
   },
   {
    "rally_key": 5,
@@ -64,7 +69,8 @@
    "score_b": 2,
    "rally_id": 5,
    "prev_a": 2,
-   "prev_b": 2
+   "prev_b": 2,
+   "side_a": "far"
   },
   {
    "rally_key": 6,
@@ -76,7 +82,8 @@
    "score_b": 2,
    "rally_id": 6,
    "prev_a": 3,
-   "prev_b": 2
+   "prev_b": 2,
+   "side_a": "far"
   },
   {
    "rally_key": 7,
@@ -88,7 +95,8 @@
    "score_b": 3,
    "rally_id": 7,
    "prev_a": 4,
-   "prev_b": 2
+   "prev_b": 2,
+   "side_a": "far"
   },
   {
    "rally_key": 8,
@@ -100,7 +108,8 @@
    "score_b": 4,
    "rally_id": 8,
    "prev_a": 4,
-   "prev_b": 3
+   "prev_b": 3,
+   "side_a": "far"
   },
   {
    "rally_key": 9,
@@ -112,7 +121,8 @@
    "score_b": 5,
    "rally_id": 9,
    "prev_a": 4,
-   "prev_b": 4
+   "prev_b": 4,
+   "side_a": "far"
   },
   {
    "rally_key": 10,
@@ -124,7 +134,8 @@
    "score_b": 5,
    "rally_id": 10,
    "prev_a": 4,
-   "prev_b": 5
+   "prev_b": 5,
+   "side_a": "far"
   },
   {
    "rally_key": 11,
@@ -136,7 +147,8 @@
    "score_b": 6,
    "rally_id": 11,
    "prev_a": 5,
-   "prev_b": 5
+   "prev_b": 5,
+   "side_a": "far"
   },
   {
    "rally_key": 12,
@@ -148,7 +160,8 @@
    "score_b": 6,
    "rally_id": 12,
    "prev_a": 5,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "far"
   },
   {
    "rally_key": 13,
@@ -160,7 +173,8 @@
    "score_b": 6,
    "rally_id": 13,
    "prev_a": 6,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "far"
   },
   {
    "rally_key": 14,
@@ -172,7 +186,8 @@
    "score_b": 6,
    "rally_id": 14,
    "prev_a": 7,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "far"
   },
   {
    "rally_key": 15,
@@ -184,7 +199,8 @@
    "score_b": 6,
    "rally_id": 15,
    "prev_a": 8,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "far"
   },
   {
    "rally_key": 16,
@@ -196,7 +212,8 @@
    "score_b": 7,
    "rally_id": 16,
    "prev_a": 9,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "far"
   },
   {
    "rally_key": 17,
@@ -208,7 +225,8 @@
    "score_b": 7,
    "rally_id": 17,
    "prev_a": 9,
-   "prev_b": 7
+   "prev_b": 7,
+   "side_a": "far"
   },
   {
    "rally_key": 18,
@@ -220,7 +238,8 @@
    "score_b": 7,
    "rally_id": 18,
    "prev_a": 10,
-   "prev_b": 7
+   "prev_b": 7,
+   "side_a": "far"
   },
   {
    "rally_key": 19,
@@ -232,7 +251,8 @@
    "score_b": 8,
    "rally_id": 19,
    "prev_a": 10,
-   "prev_b": 7
+   "prev_b": 7,
+   "side_a": "far"
   },
   {
    "rally_key": 20,
@@ -244,7 +264,8 @@
    "score_b": 8,
    "rally_id": 20,
    "prev_a": 10,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "far"
   },
   {
    "rally_key": 21,
@@ -256,7 +277,8 @@
    "score_b": 8,
    "rally_id": 21,
    "prev_a": 11,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "far"
   },
   {
    "rally_key": 22,
@@ -268,7 +290,8 @@
    "score_b": 8,
    "rally_id": 22,
    "prev_a": 11,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "far"
   },
   {
    "rally_key": 23,
@@ -280,7 +303,8 @@
    "score_b": 9,
    "rally_id": 23,
    "prev_a": 13,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "far"
   },
   {
    "rally_key": 24,
@@ -292,7 +316,8 @@
    "score_b": 9,
    "rally_id": 24,
    "prev_a": 13,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "far"
   },
   {
    "rally_key": 25,
@@ -304,7 +329,8 @@
    "score_b": 9,
    "rally_id": 25,
    "prev_a": 14,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "far"
   },
   {
    "rally_key": 26,
@@ -316,7 +342,8 @@
    "score_b": 9,
    "rally_id": 26,
    "prev_a": 15,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "far"
   },
   {
    "rally_key": 27,
@@ -328,7 +355,8 @@
    "score_b": 9,
    "rally_id": 27,
    "prev_a": 16,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "far"
   },
   {
    "rally_key": 28,
@@ -340,7 +368,8 @@
    "score_b": 12,
    "rally_id": 28,
    "prev_a": 16,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "far"
   },
   {
    "rally_key": 29,
@@ -352,7 +381,8 @@
    "score_b": 13,
    "rally_id": 29,
    "prev_a": 16,
-   "prev_b": 12
+   "prev_b": 12,
+   "side_a": "far"
   },
   {
    "rally_key": 30,
@@ -364,7 +394,8 @@
    "score_b": 13,
    "rally_id": 30,
    "prev_a": 16,
-   "prev_b": 13
+   "prev_b": 13,
+   "side_a": "far"
   },
   {
    "rally_key": 31,
@@ -376,7 +407,8 @@
    "score_b": 14,
    "rally_id": 31,
    "prev_a": 17,
-   "prev_b": 13
+   "prev_b": 13,
+   "side_a": "far"
   },
   {
    "rally_key": 32,
@@ -388,7 +420,8 @@
    "score_b": 14,
    "rally_id": 32,
    "prev_a": 17,
-   "prev_b": 14
+   "prev_b": 14,
+   "side_a": "far"
   },
   {
    "rally_key": 33,
@@ -400,7 +433,8 @@
    "score_b": 14,
    "rally_id": 33,
    "prev_a": 18,
-   "prev_b": 14
+   "prev_b": 14,
+   "side_a": "far"
   },
   {
    "rally_key": 34,
@@ -412,7 +446,8 @@
    "score_b": 15,
    "rally_id": 34,
    "prev_a": 19,
-   "prev_b": 14
+   "prev_b": 14,
+   "side_a": "far"
   },
   {
    "rally_key": 35,
@@ -424,7 +459,8 @@
    "score_b": 16,
    "rally_id": 35,
    "prev_a": 19,
-   "prev_b": 15
+   "prev_b": 15,
+   "side_a": "far"
   },
   {
    "rally_key": 36,
@@ -436,7 +472,8 @@
    "score_b": 17,
    "rally_id": 36,
    "prev_a": 19,
-   "prev_b": 16
+   "prev_b": 16,
+   "side_a": "far"
   },
   {
    "rally_key": 37,
@@ -448,7 +485,8 @@
    "score_b": 18,
    "rally_id": 37,
    "prev_a": 19,
-   "prev_b": 17
+   "prev_b": 17,
+   "side_a": "far"
   },
   {
    "rally_key": 38,
@@ -460,7 +498,8 @@
    "score_b": 19,
    "rally_id": 38,
    "prev_a": 19,
-   "prev_b": 18
+   "prev_b": 18,
+   "side_a": "far"
   },
   {
    "rally_key": 39,
@@ -472,7 +511,8 @@
    "score_b": 20,
    "rally_id": 39,
    "prev_a": 19,
-   "prev_b": 19
+   "prev_b": 19,
+   "side_a": "far"
   },
   {
    "rally_key": 40,
@@ -484,7 +524,8 @@
    "score_b": 20,
    "rally_id": 40,
    "prev_a": 19,
-   "prev_b": 20
+   "prev_b": 20,
+   "side_a": "far"
   },
   {
    "rally_key": 41,
@@ -496,7 +537,8 @@
    "score_b": 20,
    "rally_id": 41,
    "prev_a": 20,
-   "prev_b": 20
+   "prev_b": 20,
+   "side_a": "far"
   },
   {
    "rally_key": 42,
@@ -508,7 +550,8 @@
    "score_b": 21,
    "rally_id": 42,
    "prev_a": 21,
-   "prev_b": 20
+   "prev_b": 20,
+   "side_a": "far"
   },
   {
    "rally_key": 43,
@@ -520,7 +563,8 @@
    "score_b": 22,
    "rally_id": 43,
    "prev_a": 21,
-   "prev_b": 21
+   "prev_b": 21,
+   "side_a": "far"
   },
   {
    "rally_key": 44,
@@ -532,7 +576,8 @@
    "score_b": 22,
    "rally_id": 44,
    "prev_a": 21,
-   "prev_b": 22
+   "prev_b": 22,
+   "side_a": "far"
   },
   {
    "rally_key": 45,
@@ -544,7 +589,8 @@
    "score_b": 22,
    "rally_id": 45,
    "prev_a": 22,
-   "prev_b": 22
+   "prev_b": 22,
+   "side_a": "far"
   },
   {
    "rally_key": 46,
@@ -556,7 +602,8 @@
    "score_b": 22,
    "rally_id": 46,
    "prev_a": 23,
-   "prev_b": 22
+   "prev_b": 22,
+   "side_a": "far"
   },
   {
    "rally_key": 47,
@@ -568,7 +615,8 @@
    "score_b": 0,
    "rally_id": 1,
    "prev_a": 0,
-   "prev_b": 0
+   "prev_b": 0,
+   "side_a": "near"
   },
   {
    "rally_key": 48,
@@ -580,7 +628,8 @@
    "score_b": 1,
    "rally_id": 2,
    "prev_a": 0,
-   "prev_b": 0
+   "prev_b": 0,
+   "side_a": "near"
   },
   {
    "rally_key": 49,
@@ -592,7 +641,8 @@
    "score_b": 2,
    "rally_id": 3,
    "prev_a": 1,
-   "prev_b": 1
+   "prev_b": 1,
+   "side_a": "near"
   },
   {
    "rally_key": 50,
@@ -604,7 +654,8 @@
    "score_b": 3,
    "rally_id": 4,
    "prev_a": 1,
-   "prev_b": 2
+   "prev_b": 2,
+   "side_a": "near"
   },
   {
    "rally_key": 51,
@@ -616,7 +667,8 @@
    "score_b": 4,
    "rally_id": 5,
    "prev_a": 1,
-   "prev_b": 3
+   "prev_b": 3,
+   "side_a": "near"
   },
   {
    "rally_key": 52,
@@ -628,7 +680,8 @@
    "score_b": 4,
    "rally_id": 6,
    "prev_a": 1,
-   "prev_b": 4
+   "prev_b": 4,
+   "side_a": "near"
   },
   {
    "rally_key": 53,
@@ -640,7 +693,8 @@
    "score_b": 5,
    "rally_id": 7,
    "prev_a": 2,
-   "prev_b": 4
+   "prev_b": 4,
+   "side_a": "near"
   },
   {
    "rally_key": 54,
@@ -652,7 +706,8 @@
    "score_b": 5,
    "rally_id": 8,
    "prev_a": 2,
-   "prev_b": 5
+   "prev_b": 5,
+   "side_a": "near"
   },
   {
    "rally_key": 55,
@@ -664,7 +719,8 @@
    "score_b": 5,
    "rally_id": 9,
    "prev_a": 3,
-   "prev_b": 5
+   "prev_b": 5,
+   "side_a": "near"
   },
   {
    "rally_key": 56,
@@ -676,7 +732,8 @@
    "score_b": 5,
    "rally_id": 10,
    "prev_a": 4,
-   "prev_b": 5
+   "prev_b": 5,
+   "side_a": "near"
   },
   {
    "rally_key": 57,
@@ -688,7 +745,8 @@
    "score_b": 6,
    "rally_id": 11,
    "prev_a": 5,
-   "prev_b": 5
+   "prev_b": 5,
+   "side_a": "near"
   },
   {
    "rally_key": 58,
@@ -700,7 +758,8 @@
    "score_b": 6,
    "rally_id": 12,
    "prev_a": 5,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "near"
   },
   {
    "rally_key": 59,
@@ -712,7 +771,8 @@
    "score_b": 6,
    "rally_id": 13,
    "prev_a": 6,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "near"
   },
   {
    "rally_key": 60,
@@ -724,7 +784,8 @@
    "score_b": 7,
    "rally_id": 14,
    "prev_a": 7,
-   "prev_b": 6
+   "prev_b": 6,
+   "side_a": "near"
   },
   {
    "rally_key": 61,
@@ -736,7 +797,8 @@
    "score_b": 7,
    "rally_id": 15,
    "prev_a": 7,
-   "prev_b": 7
+   "prev_b": 7,
+   "side_a": "near"
   },
   {
    "rally_key": 62,
@@ -748,7 +810,8 @@
    "score_b": 8,
    "rally_id": 16,
    "prev_a": 8,
-   "prev_b": 7
+   "prev_b": 7,
+   "side_a": "near"
   },
   {
    "rally_key": 63,
@@ -760,7 +823,8 @@
    "score_b": 8,
    "rally_id": 17,
    "prev_a": 8,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "near"
   },
   {
    "rally_key": 64,
@@ -772,7 +836,8 @@
    "score_b": 8,
    "rally_id": 18,
    "prev_a": 9,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "near"
   },
   {
    "rally_key": 65,
@@ -784,7 +849,8 @@
    "score_b": 9,
    "rally_id": 19,
    "prev_a": 10,
-   "prev_b": 8
+   "prev_b": 8,
+   "side_a": "near"
   },
   {
    "rally_key": 66,
@@ -796,7 +862,8 @@
    "score_b": 9,
    "rally_id": 20,
    "prev_a": 10,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "near"
   },
   {
    "rally_key": 67,
@@ -808,7 +875,8 @@
    "score_b": 9,
    "rally_id": 21,
    "prev_a": 11,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "near"
   },
   {
    "rally_key": 68,
@@ -820,7 +888,8 @@
    "score_b": 10,
    "rally_id": 22,
    "prev_a": 12,
-   "prev_b": 9
+   "prev_b": 9,
+   "side_a": "near"
   },
   {
    "rally_key": 69,
@@ -832,7 +901,8 @@
    "score_b": 10,
    "rally_id": 23,
    "prev_a": 12,
-   "prev_b": 10
+   "prev_b": 10,
+   "side_a": "near"
   },
   {
    "rally_key": 70,
@@ -844,7 +914,8 @@
    "score_b": 11,
    "rally_id": 24,
    "prev_a": 13,
-   "prev_b": 10
+   "prev_b": 10,
+   "side_a": "near"
   },
   {
    "rally_key": 71,
@@ -856,7 +927,8 @@
    "score_b": 11,
    "rally_id": 25,
    "prev_a": 13,
-   "prev_b": 11
+   "prev_b": 11,
+   "side_a": "near"
   },
   {
    "rally_key": 72,
@@ -868,7 +940,8 @@
    "score_b": 11,
    "rally_id": 26,
    "prev_a": 14,
-   "prev_b": 11
+   "prev_b": 11,
+   "side_a": "near"
   },
   {
    "rally_key": 73,
@@ -880,7 +953,8 @@
    "score_b": 11,
    "rally_id": 27,
    "prev_a": 15,
-   "prev_b": 11
+   "prev_b": 11,
+   "side_a": "near"
   },
   {
    "rally_key": 74,
@@ -892,7 +966,8 @@
    "score_b": 12,
    "rally_id": 28,
    "prev_a": 16,
-   "prev_b": 11
+   "prev_b": 11,
+   "side_a": "near"
   },
   {
    "rally_key": 75,
@@ -904,7 +979,8 @@
    "score_b": 13,
    "rally_id": 29,
    "prev_a": 16,
-   "prev_b": 12
+   "prev_b": 12,
+   "side_a": "near"
   },
   {
    "rally_key": 76,
@@ -916,7 +992,8 @@
    "score_b": 14,
    "rally_id": 30,
    "prev_a": 16,
-   "prev_b": 13
+   "prev_b": 13,
+   "side_a": "near"
   },
   {
    "rally_key": 77,
@@ -928,7 +1005,8 @@
    "score_b": 14,
    "rally_id": 31,
    "prev_a": 16,
-   "prev_b": 14
+   "prev_b": 14,
+   "side_a": "near"
   },
   {
    "rally_key": 78,
@@ -940,7 +1018,8 @@
    "score_b": 15,
    "rally_id": 32,
    "prev_a": 17,
-   "prev_b": 14
+   "prev_b": 14,
+   "side_a": "near"
   },
   {
    "rally_key": 79,
@@ -952,7 +1031,8 @@
    "score_b": 15,
    "rally_id": 33,
    "prev_a": 17,
-   "prev_b": 15
+   "prev_b": 15,
+   "side_a": "near"
   },
   {
    "rally_key": 80,
@@ -964,7 +1044,8 @@
    "score_b": 16,
    "rally_id": 34,
    "prev_a": 18,
-   "prev_b": 15
+   "prev_b": 15,
+   "side_a": "near"
   },
   {
    "rally_key": 81,
@@ -976,7 +1057,8 @@
    "score_b": 16,
    "rally_id": 35,
    "prev_a": 18,
-   "prev_b": 16
+   "prev_b": 16,
+   "side_a": "near"
   },
   {
    "rally_key": 82,
@@ -988,7 +1070,8 @@
    "score_b": 17,
    "rally_id": 36,
    "prev_a": 19,
-   "prev_b": 16
+   "prev_b": 16,
+   "side_a": "near"
   },
   {
    "rally_key": 83,
@@ -1000,7 +1083,8 @@
    "score_b": 17,
    "rally_id": 37,
    "prev_a": 19,
-   "prev_b": 17
+   "prev_b": 17,
+   "side_a": "near"
   },
   {
    "rally_key": 84,
@@ -1012,7 +1096,8 @@
    "score_b": 17,
    "rally_id": 38,
    "prev_a": 19,
-   "prev_b": 17
+   "prev_b": 17,
+   "side_a": "near"
   }
  ],
  "events": [
@@ -1022,7 +1107,8 @@
    "top": 1,
    "bot": 0,
    "winner": NaN,
-   "new_set": false
+   "new_set": false,
+   "jump": null
   },
   {
    "frame": 14340,
@@ -1030,7 +1116,8 @@
    "top": 2,
    "bot": 0,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 15420,
@@ -1038,7 +1125,8 @@
    "top": 2,
    "bot": 1,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 16530,
@@ -1046,7 +1134,8 @@
    "top": 2,
    "bot": 2,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 17520,
@@ -1054,7 +1143,8 @@
    "top": 2,
    "bot": 3,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 18750,
@@ -1062,7 +1152,8 @@
    "top": 2,
    "bot": 4,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 19410,
@@ -1070,7 +1161,8 @@
    "top": 3,
    "bot": 4,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 20250,
@@ -1078,7 +1170,8 @@
    "top": 4,
    "bot": 4,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 20670,
@@ -1086,7 +1179,8 @@
    "top": 5,
    "bot": 4,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 21630,
@@ -1094,7 +1188,8 @@
    "top": 5,
    "bot": 5,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 22230,
@@ -1102,7 +1197,8 @@
    "top": 6,
    "bot": 5,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 22800,
@@ -1110,7 +1206,8 @@
    "top": 6,
    "bot": 6,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 25020,
@@ -1118,7 +1215,8 @@
    "top": 6,
    "bot": 7,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 25830,
@@ -1126,7 +1224,8 @@
    "top": 6,
    "bot": 8,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 26370,
@@ -1134,7 +1233,8 @@
    "top": 6,
    "bot": 9,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 27510,
@@ -1142,7 +1242,8 @@
    "top": 7,
    "bot": 9,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 28680,
@@ -1150,7 +1251,8 @@
    "top": 7,
    "bot": 10,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 29520,
@@ -1158,7 +1260,8 @@
    "top": 8,
    "bot": 10,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 30270,
@@ -1166,7 +1269,8 @@
    "top": 8,
    "bot": 11,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 32520,
@@ -1174,7 +1278,8 @@
    "top": 8,
    "bot": 12,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 33060,
@@ -1182,7 +1287,8 @@
    "top": 8,
    "bot": 13,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 34320,
@@ -1190,7 +1296,8 @@
    "top": 9,
    "bot": 13,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 35850,
@@ -1198,7 +1305,8 @@
    "top": 9,
    "bot": 14,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 37080,
@@ -1206,7 +1314,8 @@
    "top": 9,
    "bot": 15,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 37680,
@@ -1214,7 +1323,8 @@
    "top": 9,
    "bot": 16,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 38280,
@@ -1222,7 +1332,8 @@
    "top": 10,
    "bot": 16,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 39510,
@@ -1230,7 +1341,8 @@
    "top": 12,
    "bot": 16,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 2
   },
   {
    "frame": 40290,
@@ -1238,7 +1350,8 @@
    "top": 13,
    "bot": 16,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 40920,
@@ -1246,7 +1359,8 @@
    "top": 13,
    "bot": 17,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 42930,
@@ -1254,7 +1368,8 @@
    "top": 14,
    "bot": 17,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 44610,
@@ -1262,7 +1377,8 @@
    "top": 14,
    "bot": 18,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 46050,
@@ -1270,7 +1386,8 @@
    "top": 14,
    "bot": 19,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 46740,
@@ -1278,7 +1395,8 @@
    "top": 15,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 48210,
@@ -1286,7 +1404,8 @@
    "top": 16,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 49230,
@@ -1294,7 +1413,8 @@
    "top": 17,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 49710,
@@ -1302,7 +1422,8 @@
    "top": 18,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 50610,
@@ -1310,7 +1431,8 @@
    "top": 19,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 51000,
@@ -1318,7 +1440,8 @@
    "top": 20,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 52350,
@@ -1326,7 +1449,8 @@
    "top": 20,
    "bot": 20,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 53070,
@@ -1334,7 +1458,8 @@
    "top": 20,
    "bot": 21,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 54090,
@@ -1342,7 +1467,8 @@
    "top": 21,
    "bot": 21,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 55290,
@@ -1350,7 +1476,8 @@
    "top": 22,
    "bot": 21,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 56640,
@@ -1358,7 +1485,8 @@
    "top": 22,
    "bot": 22,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 57990,
@@ -1366,7 +1494,8 @@
    "top": 22,
    "bot": 23,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 59670,
@@ -1374,7 +1503,8 @@
    "top": 22,
    "bot": 24,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 68130,
@@ -1382,7 +1512,8 @@
    "top": 1,
    "bot": 1,
    "winner": NaN,
-   "new_set": true
+   "new_set": true,
+   "jump": null
   },
   {
    "frame": 69480,
@@ -1390,7 +1521,8 @@
    "top": 2,
    "bot": 1,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 69930,
@@ -1398,7 +1530,8 @@
    "top": 3,
    "bot": 1,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 70830,
@@ -1406,7 +1539,8 @@
    "top": 4,
    "bot": 1,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 71550,
@@ -1414,7 +1548,8 @@
    "top": 4,
    "bot": 2,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 72300,
@@ -1422,7 +1557,8 @@
    "top": 5,
    "bot": 2,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 73080,
@@ -1430,7 +1566,8 @@
    "top": 5,
    "bot": 3,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 73470,
@@ -1438,7 +1575,8 @@
    "top": 5,
    "bot": 4,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 74250,
@@ -1446,7 +1584,8 @@
    "top": 5,
    "bot": 5,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 75600,
@@ -1454,7 +1593,8 @@
    "top": 6,
    "bot": 5,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 76410,
@@ -1462,7 +1602,8 @@
    "top": 6,
    "bot": 6,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 77880,
@@ -1470,7 +1611,8 @@
    "top": 6,
    "bot": 7,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 78900,
@@ -1478,7 +1620,8 @@
    "top": 7,
    "bot": 7,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 79500,
@@ -1486,7 +1629,8 @@
    "top": 7,
    "bot": 8,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 80220,
@@ -1494,7 +1638,8 @@
    "top": 8,
    "bot": 8,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 81120,
@@ -1502,7 +1647,8 @@
    "top": 8,
    "bot": 9,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 82320,
@@ -1510,7 +1656,8 @@
    "top": 8,
    "bot": 10,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 84120,
@@ -1518,7 +1665,8 @@
    "top": 9,
    "bot": 10,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 86010,
@@ -1526,7 +1674,8 @@
    "top": 9,
    "bot": 11,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 88470,
@@ -1534,7 +1683,8 @@
    "top": 9,
    "bot": 12,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 89790,
@@ -1542,7 +1692,8 @@
    "top": 10,
    "bot": 12,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 90780,
@@ -1550,7 +1701,8 @@
    "top": 10,
    "bot": 13,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 91650,
@@ -1558,7 +1710,8 @@
    "top": 11,
    "bot": 13,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 92280,
@@ -1566,7 +1719,8 @@
    "top": 11,
    "bot": 14,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 94740,
@@ -1574,7 +1728,8 @@
    "top": 11,
    "bot": 15,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 95430,
@@ -1582,7 +1737,8 @@
    "top": 11,
    "bot": 16,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 96090,
@@ -1590,7 +1746,8 @@
    "top": 12,
    "bot": 16,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 97020,
@@ -1598,7 +1755,8 @@
    "top": 13,
    "bot": 16,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 98970,
@@ -1606,7 +1764,8 @@
    "top": 14,
    "bot": 16,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 102420,
@@ -1614,7 +1773,8 @@
    "top": 14,
    "bot": 17,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 103740,
@@ -1622,7 +1782,8 @@
    "top": 15,
    "bot": 17,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 104970,
@@ -1630,7 +1791,8 @@
    "top": 15,
    "bot": 18,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 106980,
@@ -1638,7 +1800,8 @@
    "top": 16,
    "bot": 18,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 107820,
@@ -1646,7 +1809,8 @@
    "top": 16,
    "bot": 19,
    "winner": "bot",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   },
   {
    "frame": 108450,
@@ -1654,7 +1818,8 @@
    "top": 17,
    "bot": 19,
    "winner": "top",
-   "new_set": false
+   "new_set": false,
+   "jump": 1
   }
  ]
 }

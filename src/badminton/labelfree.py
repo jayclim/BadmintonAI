@@ -60,8 +60,10 @@ def _pipeline_rallies(con, match_id: str) -> pd.DataFrame:
     return df
 
 
-def build(match_id: str, verbose: bool = True) -> dict:
-    """Run the OCR, align events to pipeline rallies, snapshot to JSON."""
+def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
+    """Run the OCR, align events to pipeline rallies, snapshot to JSON.
+    OCR events are reused from an existing snapshot unless rescan=True (the
+    video scan is by far the slow part; alignment logic is cheap to iterate)."""
     from . import scoreboard
     con = db.connect(read_only=True)
     ral = _pipeline_rallies(con, match_id)
@@ -71,7 +73,23 @@ def build(match_id: str, verbose: bool = True) -> dict:
             f"no label-free pipeline strokes for {match_id} — run "
             f"`python -m badminton.pipeline {match_id} --label-free --write` first")
 
-    ev = scoreboard.events(match_id)
+    ev = None
+    if not rescan and snapshot_path(match_id).exists():
+        cached = json.loads(snapshot_path(match_id).read_text()).get("events")
+        if cached:
+            ev = pd.DataFrame(cached).rename(columns={})
+            if "jump" not in ev.columns:   # older snapshots: reconstruct
+                jumps = []
+                prev = None
+                for e in ev.itertuples():
+                    if prev is None or e.new_set or e.set_no != prev.set_no:
+                        jumps.append(None)
+                    else:
+                        jumps.append(max(e.top - prev.top, e.bot - prev.bot))
+                    prev = e
+                ev["jump"] = jumps
+    if ev is None:
+        ev = scoreboard.events(match_id)
     if not len(ev):
         raise RuntimeError("score OCR produced no events for this match")
 
@@ -99,22 +117,7 @@ def build(match_id: str, verbose: bool = True) -> dict:
     else:
         row_a = "top" if top_sets > bot_sets else "bot"
 
-    # --- per-set side map (row <-> near/far), seg synthesized from pipeline rallies
-    seg = pd.DataFrame({"start": ral["f0"], "serve_player": ral["serve_side"]})
-    sm_rows = scoreboard.side_map(match_id, ev=ev, seg=seg)
-    side_a: dict[int, str] = {}
-    for (sn, row), side in sm_rows.items():
-        if row == row_a:
-            side_a[int(sn)] = side
-    # players swap ends every set — fill OCR-undecided sets from a neighbor
     all_sets = sorted(set_final)
-    for sn in all_sets:
-        if sn in side_a:
-            continue
-        for d in (1, -1):
-            if sn + d in side_a:
-                side_a[sn] = "far" if side_a[sn + d] == "near" else "near"
-                break
 
     # --- per-rally rows: set, scores, winner
     rows = []
@@ -147,13 +150,87 @@ def build(match_id: str, verbose: bool = True) -> dict:
             r["score_a"], r["score_b"] = pa, pb
         prev[sn] = (r["score_a"], r["score_b"])
 
+    # --- side of player A per RALLY ("winner serves next" votes, flip-aware).
+    # Each winner event constrains which side the winning ROW serves the NEXT
+    # rally from. Per set we fit top's side as a step function with at most ONE
+    # changepoint — the deciding-game end change when the leader reaches 11.
+    votes: dict[int, list[tuple[int, str]]] = {}    # set -> [(rally_id, top_side)]
+    for i, e in assigned.items():
+        if e["winner"] is None or e.get("jump") != 1:
+            continue
+        j = i + 1                                    # the rally served next
+        if j >= len(rows) or rows[j]["set_no"] != rows[i]["set_no"]:
+            continue                                 # set point — next serve is next set
+        serve_side = ral.loc[j, "serve_side"]
+        if serve_side not in ("near", "far"):
+            continue
+        top_side = serve_side if e["winner"] == "top" else \
+            ("far" if serve_side == "near" else "near")
+        votes.setdefault(rows[j]["set_no"], []).append((rows[j]["rally_id"], top_side))
+
+    flipped = {"near": "far", "far": "near"}
+    top_fn: dict[int, tuple[str, int | None]] = {}   # set -> (start side, flip rally_id|None)
+    sets_in_rows = sorted({r["set_no"] for r in rows})
+    for sn in sets_in_rows:
+        vs = sorted(votes.get(sn, []))
+        if not vs:
+            continue
+        # The end change at 11 exists ONLY in a deciding game — candidates are
+        # restricted to set 3+ (a false flip from vote noise corrupts half a set).
+        cands: list[int] = []
+        if sn >= 3 and sn == sets_in_rows[-1]:
+            cands = [r["rally_id"] for r in rows if r["set_no"] == sn
+                     and max(r["prev_a"], r["prev_b"]) == 11]
+            if not cands:
+                cands = [r["rally_id"] for r in rows if r["set_no"] == sn
+                         and max(r["prev_a"], r["prev_b"]) in (10, 12)]
+        best = None                                  # (score, has_flip, side, k)
+        for side in ("near", "far"):
+            score0 = sum((side == s) for _, s in vs)
+            if best is None or score0 > best[0]:
+                best = (score0, False, side, None)
+            for k in cands:
+                score = sum(((side if rid < k else flipped[side]) == s) for rid, s in vs)
+                if score >= (best[0] + 2 if not best[1] else best[0] + 1):
+                    best = (score, True, side, k)
+        top_fn[sn] = (best[2], best[3] if best[1] else None)
+    # vote-less sets: players swap ends between sets — alternate from a neighbor
+    for idx, sn in enumerate(sets_in_rows):
+        if sn in top_fn:
+            continue
+        for d in (-1, 1):
+            nb = sets_in_rows[idx + d] if 0 <= idx + d < len(sets_in_rows) else None
+            if nb in top_fn:
+                start, k = top_fn[nb]
+                end_side = flipped[start] if k is not None else start
+                top_fn[sn] = (flipped[end_side] if d == -1 else flipped[start], None)
+                break
+
+    for r in rows:
+        fn = top_fn.get(r["set_no"])
+        if fn is None:
+            r["side_a"] = None
+            continue
+        start, k = fn
+        top_side = start if (k is None or r["rally_id"] < k) else flipped[start]
+        r["side_a"] = top_side if row_a == "top" else flipped[top_side]
+
+    # per-set summary (majority) kept for set-level consumers + the verbose print
+    side_a: dict[int, str] = {}
+    for sn in sets_in_rows:
+        ss = [r["side_a"] for r in rows if r["set_no"] == sn and r["side_a"]]
+        if ss:
+            side_a[sn] = max(set(ss), key=ss.count)
+
     snap = dict(match_id=match_id, row_a=row_a,
                 side_a={str(sn): s for sn, s in side_a.items()},
+                flips={str(sn): k for sn, (_, k) in top_fn.items() if k is not None},
                 rallies=rows,
-                # raw OCR readings, kept for the dashboard's OCR demo
+                # raw OCR readings, kept for the dashboard's OCR demo + fast rebuilds
                 events=[dict(frame=int(e["frame"]), set_no=int(e["set_no"]),
                              top=int(e["top"]), bot=int(e["bot"]),
-                             winner=e["winner"], new_set=bool(e["new_set"]))
+                             winner=e["winner"], new_set=bool(e["new_set"]),
+                             jump=None if pd.isna(e.get("jump")) else int(e["jump"]))
                         for _, e in ev.iterrows()])
     SNAP_DIR.mkdir(parents=True, exist_ok=True)
     snapshot_path(match_id).write_text(json.dumps(snap, indent=1))
@@ -182,6 +259,18 @@ def side_map(match_id: str) -> dict:
     return out
 
 
+def rally_side_map(match_id: str) -> dict:
+    """(set_no, rally_id) -> {'A': side, 'B': side} — rally-level, flip-aware
+    (the deciding-game end change at 11 is encoded in the snapshot)."""
+    out = {}
+    for r in _load(match_id)["rallies"]:
+        sa = r.get("side_a")
+        if sa:
+            out[(int(r["set_no"]), int(r["rally_id"]))] = \
+                {"A": sa, "B": "far" if sa == "near" else "near"}
+    return out
+
+
 # ------------------------------------------------------------------ data frames
 
 def stroke_df(match_id: str) -> pd.DataFrame:
@@ -189,7 +278,6 @@ def stroke_df(match_id: str) -> pd.DataFrame:
     frame_num is the VIDEO frame; hitter/receiver are mapped to 'A'/'B'."""
     snap = _load(match_id)
     key = {r["rally_key"]: r for r in snap["rallies"]}
-    smap = side_map(match_id)
 
     con = db.connect(read_only=True)
     df = con.execute(
@@ -207,11 +295,15 @@ def stroke_df(match_id: str) -> pd.DataFrame:
     df["score_a"] = df["rally_key"].map(lambda k: key[k]["score_a"])
     df["score_b"] = df["rally_key"].map(lambda k: key[k]["score_b"])
 
-    side2p = {(sn, side): p for (sn, p), side in smap.items()}
-    def to_player(sn, side):
-        return side2p.get((int(sn), side), "A" if side == "near" else "B")
-    df["hitter"] = [to_player(sn, s) for sn, s in zip(df["set_no"], df["hitter_side"])]
-    df["receiver"] = [to_player(sn, s) for sn, s in zip(df["set_no"], df["recv_side"])]
+    # hitter/receiver -> 'A'/'B' via the per-RALLY side (flip-aware for deciding sets)
+    side_a_of = {r["rally_key"]: r.get("side_a") for r in snap["rallies"]}
+    def to_player(rk, side):
+        sa = side_a_of.get(int(rk))
+        if sa is None:
+            return "A" if side == "near" else "B"
+        return "A" if side == sa else "B"
+    df["hitter"] = [to_player(rk, s) for rk, s in zip(df["rally_key"], df["hitter_side"])]
+    df["receiver"] = [to_player(rk, s) for rk, s in zip(df["rally_key"], df["recv_side"])]
 
     df["shot"] = df["shot_type"].fillna("—")
     # labeled-sdf columns that have no label-free source yet
@@ -346,18 +438,18 @@ def rally_detail(sdf: pd.DataFrame, fps: float, set_no: int, rally_id: int) -> l
     return out
 
 
-def movement_by_player(match_id: str, rdf: pd.DataFrame, smap: dict) -> dict:
+def movement_by_player(match_id: str, rdf: pd.DataFrame, rmap: dict) -> dict:
     """insights.movement_by_player with label-free rally windows (video frames,
-    offset 0) and the OCR-derived side map."""
+    offset 0) and the OCR-derived per-RALLY side map (rally_side_map)."""
     fps = float(config.get_match(match_id)["fps"])
     dist = {"A": 0.0, "B": 0.0}
     secs = {"A": 0.0, "B": 0.0}
     pos = {"A": [], "B": []}
     for r in rdf.itertuples():
         series = analytics.player_series(match_id, int(r.f0), int(r.f1))
+        rs = rmap.get((int(r.set_no), int(r.rally_id)), {})
         for side, arr in series.items():
-            who = next((p for p in ("A", "B")
-                        if smap.get((int(r.set_no), p)) == side), None)
+            who = next((p for p in ("A", "B") if rs.get(p) == side), None)
             if who is None or len(arr) < 3:
                 continue
             mt = analytics.player_metrics(arr, fps)
@@ -417,7 +509,26 @@ def validate(match_id: str) -> None:
     lab_sm = insights.side_map_from(sdf_lab)
     lf_sm = side_map(match_id)
     agree = [lab_sm.get(k) == v for k, v in lf_sm.items() if k in lab_sm]
-    print(f"side map: {sum(agree)}/{len(agree)} entries agree")
+    print(f"side map (per set): {sum(agree)}/{len(agree)} entries agree")
+
+    # per-rally sides (the 3-set-critical granularity), order-aligned within set
+    lab_rm = insights.rally_side_map(sdf_lab)
+    lf_rm = rally_side_map(match_id)
+    ok = tot = 0
+    for sn in sorted(rdf_lab["set_no"].unique()):
+        la = [lab_rm.get((sn, int(r))) for r in
+              rdf_lab[rdf_lab["set_no"] == sn]["rally_id"]]
+        lf = [lf_rm.get((sn, int(r))) for r in
+              rdf_lf[rdf_lf["set_no"] == sn]["rally_id"]]
+        for x, y in zip(la, lf):
+            if x and y:
+                tot += 1
+                ok += x["A"] == y["A"]
+    print(f"per-rally sides (order-aligned): {ok}/{tot} agree"
+          + (f" ({ok / tot:.1%})" if tot else ""))
+    snap = _load(match_id)
+    if snap.get("flips"):
+        print(f"deciding-set end-change detected at rally: {snap['flips']}")
 
 
 if __name__ == "__main__":

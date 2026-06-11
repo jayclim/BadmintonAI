@@ -112,10 +112,12 @@ def stroke_df(match_id: str) -> pd.DataFrame:
                      ("receiver_x", "receiver_y", "recv_mx", "recv_my"),
                      ("landing_x", "landing_y", "land_mx", "land_my")])
 
-    # normalized orientation: flip rows where the HITTER was on the far half that set,
-    # so every stroke is "hitter at the bottom, hitting up"
-    smap = side_map_from(df)
-    flip = df.apply(lambda r: smap.get((r.set_no, r.hitter)) == "far", axis=1).to_numpy()
+    # normalized orientation: flip rows where the HITTER was on the far half for
+    # that RALLY, so every stroke is "hitter at the bottom, hitting up". Rally-level
+    # (not set-level) so the deciding-set mid-game end change at 11 is handled.
+    rmap = rally_side_map(df)
+    flip = df.apply(lambda r: rmap.get((r.set_no, r.rally_id), {})
+                    .get(r.hitter) == "far", axis=1).to_numpy()
     W, L = court.COURT_WIDTH_M, court.COURT_LENGTH_M
     for mx, my, nx, ny in [("hitter_mx", "hitter_my", "hitter_nx", "hitter_ny"),
                            ("recv_mx", "recv_my", "recv_nx", "recv_ny"),
@@ -125,8 +127,26 @@ def stroke_df(match_id: str) -> pd.DataFrame:
     return df
 
 
+def rally_side_map(sdf: pd.DataFrame) -> dict:
+    """(set_no, rally_id) -> {'A': 'near'|'far', 'B': ...} from mean labeled hitter
+    depth per rally. Rally-level is the safe granularity: players cannot change
+    ends inside a rally, but DO change mid-set in a deciding game (at 11)."""
+    out: dict = {}
+    for (sn, rid, h), g in sdf.dropna(subset=["hitter_my"]) \
+            .groupby(["set_no", "rally_id", "hitter"]):
+        side = "near" if g["hitter_my"].mean() < court.NET_Y_M else "far"
+        out.setdefault((int(sn), int(rid)), {})[h] = side
+    for key, d in out.items():       # a 1-stroke rally only shows one player
+        for p, q in (("A", "B"), ("B", "A")):
+            if p in d and q not in d:
+                d[q] = "far" if d[p] == "near" else "near"
+    return out
+
+
 def side_map_from(sdf: pd.DataFrame) -> dict:
-    """(set_no, 'A'|'B') -> 'near'|'far', from mean labeled hitter depth per set."""
+    """(set_no, 'A'|'B') -> 'near'|'far' — per-set MAJORITY. Correct for sets 1-2;
+    a deciding set with the end change at 11 needs rally_side_map (this remains for
+    set-level consumers like the Streamlit lab's rally diagram)."""
     out = {}
     for (sn, h), g in sdf.dropna(subset=["hitter_my"]).groupby(["set_no", "hitter"]):
         out[(int(sn), h)] = "near" if g["hitter_my"].mean() < court.NET_Y_M else "far"
@@ -326,7 +346,7 @@ def movement_by_player(match_id: str) -> dict:
     per-set near/far mapping applied (sides swap between sets). Positions are
     returned NORMALIZED (player always on the near half)."""
     sdf = stroke_df(match_id)
-    smap = side_map_from(sdf)
+    rmap = rally_side_map(sdf)
     _, fps = _H_fps(match_id)
     W, L = court.COURT_WIDTH_M, court.COURT_LENGTH_M
 
@@ -334,10 +354,11 @@ def movement_by_player(match_id: str) -> dict:
     dist = {"A": 0.0, "B": 0.0}
     secs = {"A": 0.0, "B": 0.0}
     pos = {"A": [], "B": []}
-    for (sn, _), (f0, f1) in spans.iterrows():
+    for (sn, rid), (f0, f1) in spans.iterrows():
         series = analytics.player_series(match_id, int(f0) + SS_OFFSET, int(f1) + SS_OFFSET)
+        rs = rmap.get((int(sn), int(rid)), {})
         for side, arr in series.items():
-            who = next((p for p in ("A", "B") if smap.get((int(sn), p)) == side), None)
+            who = next((p for p in ("A", "B") if rs.get(p) == side), None)
             if who is None or len(arr) < 3:
                 continue
             mt = analytics.player_metrics(arr, fps)
