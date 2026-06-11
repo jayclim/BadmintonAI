@@ -4,12 +4,15 @@ Per rally: detected hits (hits.py) → hitter/receiver court positions (tracks a
 hit frame) → landing = next contact's shuttle position (final stroke: find_landing)
 → geometry shot classifier (shotclass.py) trained on the OTHER match's labels.
 
-Still label-dependent (deliberately, for now): rally WINDOWS + the per-set side map
-come from ShuttleSet. Replacing those needs a rally segmenter (shuttle-motion runs +
-replay rejection) — listed in HANDOFF next steps. Everything inside a rally is CV-only.
+Rally windows come from ShuttleSet labels by default, or from the label-free
+segmenter (segment.py) with --label-free: that path has NO ShuttleSet dependency
+at inference time (labels are only consulted to SCORE the result). Label-free
+rallies are keyed set_no=0, rally_id=rally_key — set boundaries (and hence the
+per-set side map / player names) still need score OCR or manual entry.
 
 CLI:
   PYTHONPATH=src python -m badminton.pipeline <match_id>          # build + evaluate
+  PYTHONPATH=src python -m badminton.pipeline <match_id> --label-free
   PYTHONPATH=src python -m badminton.pipeline <match_id> --write  # also persist to DB
 """
 
@@ -36,17 +39,29 @@ def _track_pos(con, match_id: str, frame: int, player: str, img: bool = False):
         else (float(row[0]), float(row[1]))
 
 
-def build_strokes(match_id: str) -> pd.DataFrame:
-    """One row per DETECTED stroke, with court coords + geometry features."""
+def rally_windows(match_id: str, label_free: bool = False) -> list[tuple]:
+    """[(set_no, rally_id, f0, f1)] hit-detection windows, one per rally.
+    Labeled: stroke frames ± 20. Label-free: segment.py windows (set_no=0)."""
+    if label_free:
+        from . import segment
+        return [(0, int(r.rally_key), int(r.start) - 8, int(r.last_hit) + 8)
+                for r in segment.segments(match_id).itertuples()]
     sdf = insights.stroke_df(match_id)
+    off = hits.shuttle_offset(match_id)
+    out = []
+    for (sn, rid), g in sdf.groupby(["set_no", "rally_id"]):
+        lab_f = g["frame_num"].astype(int) + off
+        out.append((int(sn), int(rid), int(lab_f.min() - 20), int(lab_f.max() + 20)))
+    return out
+
+
+def build_strokes(match_id: str, label_free: bool = False) -> pd.DataFrame:
+    """One row per DETECTED stroke, with court coords + geometry features."""
     H = np.array(config.get_match(match_id)["homography"], np.float32).reshape(3, 3)
     con = db.connect(read_only=True)
 
-    off = hits.shuttle_offset(match_id)
     rows = []
-    for (sn, rid), g in sdf.groupby(["set_no", "rally_id"]):
-        lab_f = (g["frame_num"].astype(int) + off)
-        f0, f1 = int(lab_f.min() - 20), int(lab_f.max() + 20)
+    for sn, rid, f0, f1 in rally_windows(match_id, label_free):
         dh = hits.detect_hits(match_id, f0, f1)
         hits.attribute_hits(match_id, dh)
         dh = [h for h in dh if h.get("player") in ("near", "far")]
@@ -69,7 +84,7 @@ def build_strokes(match_id: str) -> pd.DataFrame:
             rx, ry = _track_pos(con, match_id, h["frame"], recv)
             lx, ly = land_xy[i]
             rows.append(dict(
-                match_id=match_id, set_no=int(sn), rally_id=int(rid),
+                match_id=match_id, set_no=sn, rally_id=rid,
                 ball_round=i + 1, frame_num=h["frame"], hitter=hitter, receiver=recv,
                 hitter_x=hx, hitter_y=hy, receiver_x=rx, receiver_y=ry,
                 hit_img_x=h["x"], hit_img_y=h["y"], landing_x=lx, landing_y=ly,
@@ -176,17 +191,24 @@ def write_strokes(match_id: str, df: pd.DataFrame) -> int:
 
 
 def evaluate(match_id: str, train_match: str, verbose: bool = True,
-             use_bst: bool = True) -> dict:
-    """End-to-end agreement of pipeline strokes vs ShuttleSet labels."""
-    df = classify(build_strokes(match_id), train_match, use_bst=use_bst)
+             use_bst: bool = True, label_free: bool = False) -> dict:
+    """End-to-end agreement of pipeline strokes vs ShuttleSet labels.
+    With label_free=True the rally keys don't correspond to labels, so strokes
+    are matched GLOBALLY by frame instead of within each labeled rally."""
+    df = classify(build_strokes(match_id, label_free=label_free), train_match,
+                  use_bst=use_bst)
     sdf = insights.stroke_df(match_id)
     smap = insights.side_map_from(sdf)
 
     off = hits.shuttle_offset(match_id)
     n_match = hit_ok = shot_ok = shot_n = 0
+    global_used = np.zeros(len(df), bool)
     for (sn, rid), g in sdf.groupby(["set_no", "rally_id"]):
-        ours = df[(df["set_no"] == sn) & (df["rally_id"] == rid)]
-        used = np.zeros(len(ours), bool)
+        if label_free:
+            ours, used = df, global_used  # one-to-one across the whole match
+        else:
+            ours = df[(df["set_no"] == sn) & (df["rally_id"] == rid)]
+            used = np.zeros(len(ours), bool)
         of = ours["frame_num"].to_numpy()
         for _, lab in g.iterrows():
             lf = int(lab["frame_num"]) + off
@@ -232,9 +254,12 @@ if __name__ == "__main__":
                          "(default: the other wired match)")
     ap.add_argument("--write", action="store_true", help="persist to the strokes table")
     ap.add_argument("--no-bst", action="store_true", help="geometry classifier only")
+    ap.add_argument("--label-free", action="store_true",
+                    help="rally windows from segment.py instead of ShuttleSet")
     args = ap.parse_args()
     train = args.train_match or OTHER.get(args.match_id, args.match_id)
-    res = evaluate(args.match_id, train, use_bst=not args.no_bst)
+    res = evaluate(args.match_id, train, use_bst=not args.no_bst,
+                   label_free=args.label_free)
     if args.write:
         n = write_strokes(args.match_id, res["df"])
         print(f"wrote {n} source='pipeline' rows")

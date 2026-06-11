@@ -236,11 +236,14 @@ def patterns(rdf: pd.DataFrame, n: int = 2, min_count: int = 2) -> list[dict]:
 
 
 def error_pressure(match_id: str, rdf: pd.DataFrame,
-                   hi: float = FORCED_SPEED) -> dict:
+                   hi: float = FORCED_SPEED,
+                   pressure: list[dict] | None = None) -> dict:
     """Split each player's rally-ending errors into forced (had to scramble) vs
-    unforced (comfortable position, < hi m/s required speed)."""
+    unforced (comfortable position, < hi m/s required speed).
+    `pressure` overrides the labeled tactics.pressure_strokes (label-free path)."""
     req = {(x["set"], x["rally"], x["shot_no"]): x["req_speed"]
-           for x in tactics.pressure_strokes(match_id)}
+           for x in (pressure if pressure is not None
+                     else tactics.pressure_strokes(match_id))}
     out = {p: dict(forced=0, unforced=0, unknown=0, errors=0) for p in ("A", "B")}
     errs = rdf[rdf["winner"].notna() & (rdf["category"] != "Winner") & (rdf["category"] != "—")]
     for _, r in errs.iterrows():
@@ -348,10 +351,11 @@ def _pct(won, n):
 
 
 def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
-                names: dict) -> list[dict]:
+                names: dict, pressure: list[dict] | None = None) -> list[dict]:
     """Rule-based, data-backed insight cards. Each note carries the rallies that
     support it so the dashboard can deep-link straight into the Film room.
-    Returns dicts: icon, title, body, keys (list of (set_no, rally_id)), score."""
+    Returns dicts: icon, title, body, keys (list of (set_no, rally_id)), score.
+    `pressure` swaps the labeled pressure model for the label-free one."""
     notes = []
     oc = shot_outcome_counts(rdf)
     finished = rdf[rdf["winner"].notna() & (rdf["category"] != "—")]
@@ -386,7 +390,7 @@ def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
                               keys=keys_for(p, r["shot"], won=False)))
 
     # 3) forced vs unforced errors
-    ep = error_pressure(match_id, rdf)
+    ep = error_pressure(match_id, rdf, pressure=pressure)
     for p in ("A", "B"):
         e = ep[p]
         known = e["forced"] + e["unforced"]

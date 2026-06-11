@@ -763,7 +763,8 @@ def page_film():
                     f"{r['prev_a']}–{r['prev_b']} → **{r['score_a']}–{r['score_b']}** · "
                     f"{r['shots']} shots · {r['duration_s']}s")
         st.markdown(end_sentence(r) + f" · serve: {NAME.get(r['server'], '—')}")
-        annotate = st.toggle("Annotated overlay (player boxes + minimap; ~60–90s first time)",
+        annotate = st.toggle("Annotated overlay (player boxes + skeletons + minimap; "
+                             "~60–90s first time)", value=True,
                              key=f"annot_{r['set_no']}_{r['rally_id']}")
         if annotate:
             annot = clip.CLIP_DIR / f"{MATCH}_s{r['set_no']}_r{r['rally_id']}_annot.mp4"

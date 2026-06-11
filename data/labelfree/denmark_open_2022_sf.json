@@ -1,0 +1,1492 @@
+{
+ "match_id": "denmark_open_2022_sf",
+ "row_a": "bot",
+ "side_a": {
+  "1": "far",
+  "2": "near"
+ },
+ "rallies": [
+  {
+   "rally_key": 1,
+   "f0": 11595,
+   "f1": 11773,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 0,
+   "score_b": 1,
+   "rally_id": 1,
+   "prev_a": 0,
+   "prev_b": 0
+  },
+  {
+   "rally_key": 2,
+   "f0": 12414,
+   "f1": 12633,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 0,
+   "score_b": 2,
+   "rally_id": 2,
+   "prev_a": 0,
+   "prev_b": 1
+  },
+  {
+   "rally_key": 3,
+   "f0": 13003,
+   "f1": 13289,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 1,
+   "score_b": 2,
+   "rally_id": 3,
+   "prev_a": 0,
+   "prev_b": 2
+  },
+  {
+   "rally_key": 4,
+   "f0": 13982,
+   "f1": 14166,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 1,
+   "score_b": 3,
+   "rally_id": 4,
+   "prev_a": 1,
+   "prev_b": 2
+  },
+  {
+   "rally_key": 5,
+   "f0": 14598,
+   "f1": 15239,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 1,
+   "score_b": 4,
+   "rally_id": 5,
+   "prev_a": 1,
+   "prev_b": 3
+  },
+  {
+   "rally_key": 6,
+   "f0": 15756,
+   "f1": 15903,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 2,
+   "score_b": 5,
+   "rally_id": 6,
+   "prev_a": 1,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 7,
+   "f0": 16361,
+   "f1": 16693,
+   "set_no": 1,
+   "winner": null,
+   "score_a": 2,
+   "score_b": 5,
+   "rally_id": 7,
+   "prev_a": 2,
+   "prev_b": 5
+  },
+  {
+   "rally_key": 8,
+   "f0": 16816,
+   "f1": 17147,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 2,
+   "score_b": 6,
+   "rally_id": 8,
+   "prev_a": 2,
+   "prev_b": 5
+  },
+  {
+   "rally_key": 9,
+   "f0": 17519,
+   "f1": 17694,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 2,
+   "score_b": 7,
+   "rally_id": 9,
+   "prev_a": 2,
+   "prev_b": 6
+  },
+  {
+   "rally_key": 10,
+   "f0": 18012,
+   "f1": 18324,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 3,
+   "score_b": 7,
+   "rally_id": 10,
+   "prev_a": 2,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 11,
+   "f0": 18857,
+   "f1": 18880,
+   "set_no": 1,
+   "winner": null,
+   "score_a": 3,
+   "score_b": 7,
+   "rally_id": 11,
+   "prev_a": 3,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 12,
+   "f0": 19072,
+   "f1": 19242,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 4,
+   "score_b": 7,
+   "rally_id": 12,
+   "prev_a": 3,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 13,
+   "f0": 19948,
+   "f1": 20013,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 5,
+   "score_b": 7,
+   "rally_id": 13,
+   "prev_a": 4,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 14,
+   "f0": 20342,
+   "f1": 20497,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 5,
+   "score_b": 8,
+   "rally_id": 14,
+   "prev_a": 5,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 15,
+   "f0": 20950,
+   "f1": 21156,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 6,
+   "score_b": 8,
+   "rally_id": 15,
+   "prev_a": 5,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 16,
+   "f0": 21665,
+   "f1": 22022,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 7,
+   "score_b": 8,
+   "rally_id": 16,
+   "prev_a": 6,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 17,
+   "f0": 22472,
+   "f1": 22766,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 8,
+   "score_b": 8,
+   "rally_id": 17,
+   "prev_a": 7,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 18,
+   "f0": 23251,
+   "f1": 23490,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 9,
+   "score_b": 8,
+   "rally_id": 18,
+   "prev_a": 8,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 19,
+   "f0": 24016,
+   "f1": 24239,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 9,
+   "score_b": 9,
+   "rally_id": 19,
+   "prev_a": 9,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 20,
+   "f0": 24829,
+   "f1": 25300,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 10,
+   "score_b": 9,
+   "rally_id": 20,
+   "prev_a": 9,
+   "prev_b": 9
+  },
+  {
+   "rally_key": 21,
+   "f0": 25912,
+   "f1": 26061,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 10,
+   "score_b": 10,
+   "rally_id": 21,
+   "prev_a": 10,
+   "prev_b": 9
+  },
+  {
+   "rally_key": 22,
+   "f0": 26462,
+   "f1": 26866,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 10,
+   "score_b": 11,
+   "rally_id": 22,
+   "prev_a": 10,
+   "prev_b": 10
+  },
+  {
+   "rally_key": 23,
+   "f0": 29134,
+   "f1": 29449,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 10,
+   "score_b": 12,
+   "rally_id": 23,
+   "prev_a": 10,
+   "prev_b": 11
+  },
+  {
+   "rally_key": 24,
+   "f0": 30164,
+   "f1": 30330,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 11,
+   "score_b": 12,
+   "rally_id": 24,
+   "prev_a": 10,
+   "prev_b": 12
+  },
+  {
+   "rally_key": 25,
+   "f0": 30750,
+   "f1": 30980,
+   "set_no": 1,
+   "winner": null,
+   "score_a": 11,
+   "score_b": 12,
+   "rally_id": 25,
+   "prev_a": 11,
+   "prev_b": 12
+  },
+  {
+   "rally_key": 26,
+   "f0": 31202,
+   "f1": 31340,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 13,
+   "score_b": 12,
+   "rally_id": 26,
+   "prev_a": 11,
+   "prev_b": 12
+  },
+  {
+   "rally_key": 27,
+   "f0": 33600,
+   "f1": 33841,
+   "set_no": 1,
+   "winner": null,
+   "score_a": 13,
+   "score_b": 12,
+   "rally_id": 27,
+   "prev_a": 13,
+   "prev_b": 12
+  },
+  {
+   "rally_key": 28,
+   "f0": 34019,
+   "f1": 34167,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 15,
+   "score_b": 13,
+   "rally_id": 28,
+   "prev_a": 13,
+   "prev_b": 12
+  },
+  {
+   "rally_key": 29,
+   "f0": 34433,
+   "f1": 34762,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 16,
+   "score_b": 13,
+   "rally_id": 29,
+   "prev_a": 15,
+   "prev_b": 13
+  },
+  {
+   "rally_key": 30,
+   "f0": 35342,
+   "f1": 35605,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 16,
+   "score_b": 14,
+   "rally_id": 30,
+   "prev_a": 16,
+   "prev_b": 13
+  },
+  {
+   "rally_key": 31,
+   "f0": 36185,
+   "f1": 36559,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 16,
+   "score_b": 15,
+   "rally_id": 31,
+   "prev_a": 16,
+   "prev_b": 14
+  },
+  {
+   "rally_key": 32,
+   "f0": 36939,
+   "f1": 37018,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 17,
+   "score_b": 15,
+   "rally_id": 32,
+   "prev_a": 16,
+   "prev_b": 15
+  },
+  {
+   "rally_key": 33,
+   "f0": 37598,
+   "f1": 37630,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 17,
+   "score_b": 16,
+   "rally_id": 33,
+   "prev_a": 17,
+   "prev_b": 15
+  },
+  {
+   "rally_key": 34,
+   "f0": 38156,
+   "f1": 38378,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 18,
+   "score_b": 16,
+   "rally_id": 34,
+   "prev_a": 17,
+   "prev_b": 16
+  },
+  {
+   "rally_key": 35,
+   "f0": 38970,
+   "f1": 39003,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 18,
+   "score_b": 17,
+   "rally_id": 35,
+   "prev_a": 18,
+   "prev_b": 16
+  },
+  {
+   "rally_key": 36,
+   "f0": 39514,
+   "f1": 39750,
+   "set_no": 1,
+   "winner": "B",
+   "score_a": 18,
+   "score_b": 18,
+   "rally_id": 36,
+   "prev_a": 18,
+   "prev_b": 17
+  },
+  {
+   "rally_key": 37,
+   "f0": 40374,
+   "f1": 40547,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 19,
+   "score_b": 18,
+   "rally_id": 37,
+   "prev_a": 18,
+   "prev_b": 18
+  },
+  {
+   "rally_key": 38,
+   "f0": 41588,
+   "f1": 41738,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 20,
+   "score_b": 18,
+   "rally_id": 38,
+   "prev_a": 19,
+   "prev_b": 18
+  },
+  {
+   "rally_key": 39,
+   "f0": 42424,
+   "f1": 43112,
+   "set_no": 1,
+   "winner": "A",
+   "score_a": 21,
+   "score_b": 18,
+   "rally_id": 39,
+   "prev_a": 20,
+   "prev_b": 18
+  },
+  {
+   "rally_key": 40,
+   "f0": 47130,
+   "f1": 47191,
+   "set_no": 2,
+   "winner": null,
+   "score_a": 0,
+   "score_b": 0,
+   "rally_id": 1,
+   "prev_a": 0,
+   "prev_b": 0
+  },
+  {
+   "rally_key": 41,
+   "f0": 47632,
+   "f1": 47677,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 0,
+   "score_b": 2,
+   "rally_id": 2,
+   "prev_a": 0,
+   "prev_b": 0
+  },
+  {
+   "rally_key": 42,
+   "f0": 47913,
+   "f1": 48506,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 8,
+   "score_b": 3,
+   "rally_id": 3,
+   "prev_a": 0,
+   "prev_b": 2
+  },
+  {
+   "rally_key": 43,
+   "f0": 48998,
+   "f1": 49171,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 1,
+   "score_b": 3,
+   "rally_id": 4,
+   "prev_a": 8,
+   "prev_b": 3
+  },
+  {
+   "rally_key": 44,
+   "f0": 49834,
+   "f1": 50074,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 2,
+   "score_b": 3,
+   "rally_id": 5,
+   "prev_a": 1,
+   "prev_b": 3
+  },
+  {
+   "rally_key": 45,
+   "f0": 50516,
+   "f1": 50994,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 2,
+   "score_b": 4,
+   "rally_id": 6,
+   "prev_a": 2,
+   "prev_b": 3
+  },
+  {
+   "rally_key": 46,
+   "f0": 52124,
+   "f1": 52417,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 3,
+   "score_b": 4,
+   "rally_id": 7,
+   "prev_a": 2,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 47,
+   "f0": 52923,
+   "f1": 53117,
+   "set_no": 2,
+   "winner": null,
+   "score_a": 3,
+   "score_b": 4,
+   "rally_id": 8,
+   "prev_a": 3,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 48,
+   "f0": 53364,
+   "f1": 53776,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 5,
+   "score_b": 4,
+   "rally_id": 9,
+   "prev_a": 3,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 49,
+   "f0": 54546,
+   "f1": 54783,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 6,
+   "score_b": 4,
+   "rally_id": 10,
+   "prev_a": 5,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 50,
+   "f0": 55350,
+   "f1": 55870,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 7,
+   "score_b": 4,
+   "rally_id": 11,
+   "prev_a": 6,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 51,
+   "f0": 57219,
+   "f1": 58320,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 8,
+   "score_b": 4,
+   "rally_id": 12,
+   "prev_a": 7,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 52,
+   "f0": 59759,
+   "f1": 59933,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 8,
+   "score_b": 5,
+   "rally_id": 13,
+   "prev_a": 8,
+   "prev_b": 4
+  },
+  {
+   "rally_key": 53,
+   "f0": 60299,
+   "f1": 60408,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 8,
+   "score_b": 6,
+   "rally_id": 14,
+   "prev_a": 8,
+   "prev_b": 5
+  },
+  {
+   "rally_key": 54,
+   "f0": 61106,
+   "f1": 61411,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 8,
+   "score_b": 7,
+   "rally_id": 15,
+   "prev_a": 8,
+   "prev_b": 6
+  },
+  {
+   "rally_key": 55,
+   "f0": 61856,
+   "f1": 61979,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 9,
+   "score_b": 7,
+   "rally_id": 16,
+   "prev_a": 8,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 56,
+   "f0": 62590,
+   "f1": 62590,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 9,
+   "score_b": 8,
+   "rally_id": 17,
+   "prev_a": 9,
+   "prev_b": 7
+  },
+  {
+   "rally_key": 57,
+   "f0": 62900,
+   "f1": 63248,
+   "set_no": 2,
+   "winner": null,
+   "score_a": 9,
+   "score_b": 8,
+   "rally_id": 18,
+   "prev_a": 9,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 58,
+   "f0": 63431,
+   "f1": 63744,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 11,
+   "score_b": 8,
+   "rally_id": 19,
+   "prev_a": 9,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 59,
+   "f0": 66036,
+   "f1": 66271,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 12,
+   "score_b": 8,
+   "rally_id": 20,
+   "prev_a": 11,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 60,
+   "f0": 66767,
+   "f1": 67050,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 13,
+   "score_b": 8,
+   "rally_id": 21,
+   "prev_a": 12,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 61,
+   "f0": 67673,
+   "f1": 68105,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 13,
+   "score_b": 9,
+   "rally_id": 22,
+   "prev_a": 13,
+   "prev_b": 8
+  },
+  {
+   "rally_key": 62,
+   "f0": 69164,
+   "f1": 69891,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 14,
+   "score_b": 9,
+   "rally_id": 23,
+   "prev_a": 13,
+   "prev_b": 9
+  },
+  {
+   "rally_key": 63,
+   "f0": 71246,
+   "f1": 71715,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 14,
+   "score_b": 11,
+   "rally_id": 24,
+   "prev_a": 14,
+   "prev_b": 9
+  },
+  {
+   "rally_key": 64,
+   "f0": 72255,
+   "f1": 72415,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 14,
+   "score_b": 12,
+   "rally_id": 25,
+   "prev_a": 14,
+   "prev_b": 11
+  },
+  {
+   "rally_key": 65,
+   "f0": 72677,
+   "f1": 72806,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 14,
+   "score_b": 13,
+   "rally_id": 26,
+   "prev_a": 14,
+   "prev_b": 12
+  },
+  {
+   "rally_key": 66,
+   "f0": 73159,
+   "f1": 73455,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 14,
+   "score_b": 14,
+   "rally_id": 27,
+   "prev_a": 14,
+   "prev_b": 13
+  },
+  {
+   "rally_key": 67,
+   "f0": 74087,
+   "f1": 74858,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 15,
+   "score_b": 14,
+   "rally_id": 28,
+   "prev_a": 14,
+   "prev_b": 14
+  },
+  {
+   "rally_key": 68,
+   "f0": 75928,
+   "f1": 76077,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 16,
+   "score_b": 14,
+   "rally_id": 29,
+   "prev_a": 15,
+   "prev_b": 14
+  },
+  {
+   "rally_key": 69,
+   "f0": 76474,
+   "f1": 76722,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 17,
+   "score_b": 14,
+   "rally_id": 30,
+   "prev_a": 16,
+   "prev_b": 14
+  },
+  {
+   "rally_key": 70,
+   "f0": 78150,
+   "f1": 78742,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 18,
+   "score_b": 14,
+   "rally_id": 31,
+   "prev_a": 17,
+   "prev_b": 14
+  },
+  {
+   "rally_key": 71,
+   "f0": 79809,
+   "f1": 79809,
+   "set_no": 2,
+   "winner": "B",
+   "score_a": 18,
+   "score_b": 15,
+   "rally_id": 32,
+   "prev_a": 18,
+   "prev_b": 14
+  },
+  {
+   "rally_key": 72,
+   "f0": 80852,
+   "f1": 80985,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 19,
+   "score_b": 15,
+   "rally_id": 33,
+   "prev_a": 18,
+   "prev_b": 15
+  },
+  {
+   "rally_key": 73,
+   "f0": 81488,
+   "f1": 81745,
+   "set_no": 2,
+   "winner": "A",
+   "score_a": 20,
+   "score_b": 15,
+   "rally_id": 34,
+   "prev_a": 19,
+   "prev_b": 15
+  },
+  {
+   "rally_key": 74,
+   "f0": 82769,
+   "f1": 82860,
+   "set_no": 2,
+   "winner": null,
+   "score_a": 20,
+   "score_b": 15,
+   "rally_id": 35,
+   "prev_a": 20,
+   "prev_b": 15
+  }
+ ],
+ "events": [
+  {
+   "frame": 12420,
+   "set_no": 1,
+   "top": 1,
+   "bot": 0,
+   "winner": NaN,
+   "new_set": false
+  },
+  {
+   "frame": 12660,
+   "set_no": 1,
+   "top": 2,
+   "bot": 0,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 13440,
+   "set_no": 1,
+   "top": 2,
+   "bot": 1,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 14700,
+   "set_no": 1,
+   "top": 3,
+   "bot": 1,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 15720,
+   "set_no": 1,
+   "top": 4,
+   "bot": 1,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 15840,
+   "set_no": 1,
+   "top": 4,
+   "bot": 2,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 16620,
+   "set_no": 1,
+   "top": 5,
+   "bot": 2,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 17190,
+   "set_no": 1,
+   "top": 6,
+   "bot": 2,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 17760,
+   "set_no": 1,
+   "top": 7,
+   "bot": 2,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 18390,
+   "set_no": 1,
+   "top": 7,
+   "bot": 3,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 19290,
+   "set_no": 1,
+   "top": 7,
+   "bot": 4,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 20130,
+   "set_no": 1,
+   "top": 7,
+   "bot": 5,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 20640,
+   "set_no": 1,
+   "top": 8,
+   "bot": 5,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 21330,
+   "set_no": 1,
+   "top": 8,
+   "bot": 6,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 22410,
+   "set_no": 1,
+   "top": 8,
+   "bot": 7,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 22800,
+   "set_no": 1,
+   "top": 8,
+   "bot": 8,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 23610,
+   "set_no": 1,
+   "top": 8,
+   "bot": 9,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 24420,
+   "set_no": 1,
+   "top": 9,
+   "bot": 9,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 25950,
+   "set_no": 1,
+   "top": 9,
+   "bot": 10,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 26130,
+   "set_no": 1,
+   "top": 10,
+   "bot": 10,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 26940,
+   "set_no": 1,
+   "top": 11,
+   "bot": 10,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 29550,
+   "set_no": 1,
+   "top": 12,
+   "bot": 10,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 30420,
+   "set_no": 1,
+   "top": 12,
+   "bot": 11,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 30930,
+   "set_no": 1,
+   "top": 12,
+   "bot": 12,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 31500,
+   "set_no": 1,
+   "top": 12,
+   "bot": 13,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 32850,
+   "set_no": 1,
+   "top": 12,
+   "bot": 14,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 33780,
+   "set_no": 1,
+   "top": 12,
+   "bot": 15,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 34320,
+   "set_no": 1,
+   "top": 13,
+   "bot": 15,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 34950,
+   "set_no": 1,
+   "top": 13,
+   "bot": 16,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 35760,
+   "set_no": 1,
+   "top": 14,
+   "bot": 16,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 36630,
+   "set_no": 1,
+   "top": 15,
+   "bot": 16,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 37080,
+   "set_no": 1,
+   "top": 15,
+   "bot": 17,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 37770,
+   "set_no": 1,
+   "top": 16,
+   "bot": 17,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 38520,
+   "set_no": 1,
+   "top": 16,
+   "bot": 18,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 39150,
+   "set_no": 1,
+   "top": 17,
+   "bot": 18,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 39960,
+   "set_no": 1,
+   "top": 18,
+   "bot": 18,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 40620,
+   "set_no": 1,
+   "top": 18,
+   "bot": 19,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 41790,
+   "set_no": 1,
+   "top": 18,
+   "bot": 20,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 43200,
+   "set_no": 1,
+   "top": 18,
+   "bot": 21,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 48120,
+   "set_no": 2,
+   "top": 2,
+   "bot": 0,
+   "winner": NaN,
+   "new_set": true
+  },
+  {
+   "frame": 48600,
+   "set_no": 2,
+   "top": 3,
+   "bot": 8,
+   "winner": NaN,
+   "new_set": false
+  },
+  {
+   "frame": 48690,
+   "set_no": 2,
+   "top": 3,
+   "bot": 0,
+   "winner": NaN,
+   "new_set": false
+  },
+  {
+   "frame": 49260,
+   "set_no": 2,
+   "top": 3,
+   "bot": 1,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 50100,
+   "set_no": 2,
+   "top": 3,
+   "bot": 2,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 51960,
+   "set_no": 2,
+   "top": 4,
+   "bot": 2,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 52470,
+   "set_no": 2,
+   "top": 4,
+   "bot": 3,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 53100,
+   "set_no": 2,
+   "top": 4,
+   "bot": 4,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 53940,
+   "set_no": 2,
+   "top": 4,
+   "bot": 5,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 54870,
+   "set_no": 2,
+   "top": 4,
+   "bot": 6,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 56310,
+   "set_no": 2,
+   "top": 4,
+   "bot": 7,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 58470,
+   "set_no": 2,
+   "top": 4,
+   "bot": 8,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 60030,
+   "set_no": 2,
+   "top": 5,
+   "bot": 8,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 60540,
+   "set_no": 2,
+   "top": 6,
+   "bot": 8,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 61440,
+   "set_no": 2,
+   "top": 7,
+   "bot": 8,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 62190,
+   "set_no": 2,
+   "top": 7,
+   "bot": 9,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 62640,
+   "set_no": 2,
+   "top": 8,
+   "bot": 9,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 63090,
+   "set_no": 2,
+   "top": 8,
+   "bot": 10,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 63900,
+   "set_no": 2,
+   "top": 8,
+   "bot": 11,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 66390,
+   "set_no": 2,
+   "top": 8,
+   "bot": 12,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 67110,
+   "set_no": 2,
+   "top": 8,
+   "bot": 13,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 68250,
+   "set_no": 2,
+   "top": 9,
+   "bot": 13,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 70020,
+   "set_no": 2,
+   "top": 9,
+   "bot": 14,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 71220,
+   "set_no": 2,
+   "top": 10,
+   "bot": 14,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 71730,
+   "set_no": 2,
+   "top": 11,
+   "bot": 14,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 72420,
+   "set_no": 2,
+   "top": 12,
+   "bot": 14,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 72900,
+   "set_no": 2,
+   "top": 13,
+   "bot": 14,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 73530,
+   "set_no": 2,
+   "top": 14,
+   "bot": 14,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 74970,
+   "set_no": 2,
+   "top": 14,
+   "bot": 15,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 76140,
+   "set_no": 2,
+   "top": 14,
+   "bot": 16,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 77730,
+   "set_no": 2,
+   "top": 14,
+   "bot": 17,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 78840,
+   "set_no": 2,
+   "top": 14,
+   "bot": 18,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 80280,
+   "set_no": 2,
+   "top": 15,
+   "bot": 18,
+   "winner": "top",
+   "new_set": false
+  },
+  {
+   "frame": 81150,
+   "set_no": 2,
+   "top": 15,
+   "bot": 19,
+   "winner": "bot",
+   "new_set": false
+  },
+  {
+   "frame": 81840,
+   "set_no": 2,
+   "top": 15,
+   "bot": 20,
+   "winner": "bot",
+   "new_set": false
+  }
+ ]
+}
