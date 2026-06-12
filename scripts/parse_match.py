@@ -46,7 +46,11 @@ step = args.chunk * args.stride
 for cs in range(args.start, args.end, step):
     ce = min(cs + step, args.end)
     n_proc = (ce - cs) // args.stride
-    if args.resume and covered(cs, ce) >= n_proc * 1.4:   # ~1.6 rows/frame when fully parsed
+    # process_video DELETEs the chunk range then INSERTs at chunk end, so any
+    # rows at all mean the chunk completed. (A fixed rows/frame threshold broke
+    # resume on broadcasts with sparse stretches: All England averages ~1.2
+    # rows/frame vs India's ~1.6, so 1.4 re-parsed everything forever.)
+    if args.resume and covered(cs, ce) > 0:
         print(f"skip {cs}-{ce} (already parsed)", flush=True)
         continue
     detect.process_video(args.match, args.model, start_frame=cs, max_frames=n_proc,
