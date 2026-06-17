@@ -1,0 +1,272 @@
+"use client";
+
+/* 4-player animated 2D replay for doubles, reusing the painted court from
+   components/court.tsx (CourtLines). All geometry is true metres scaled by K px/m,
+   identical to court.tsx so the lines and dots register. Front/back is derived per
+   frame from geometry (closest-to-net = front), exactly as roles.py does, so it stays
+   correct through slot swaps. Side hue = near/far; the FRONT player is drawn solid,
+   the BACK player as a ring. */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CourtLines } from "@/components/court";
+import { COURT } from "@/lib/types";
+import {
+  type DoublesReplay,
+  type DSide,
+  type DSlot,
+  type Formation,
+  SLOTS_OF,
+} from "@/lib/doubles";
+
+const K = 30;
+const W = COURT.w, L = COURT.l, NET = COURT.net;
+const PAD = 1.0;
+const SIDE_COLOR: Record<DSide, string> = { near: "var(--pa)", far: "var(--pb)" };
+
+const svgProps = {
+  viewBox: `${-PAD * K} ${-PAD * K} ${(W + 2 * PAD) * K} ${(L + 2 * PAD) * K}`,
+};
+
+function initials(name: string | undefined, fallback: string) {
+  if (!name) return fallback;
+  return name.split(/[\s/]+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+/** current formation per side at `frame`, from the run-length segments */
+function formAt(segs: [number, number, Formation][], frame: number): Formation | null {
+  for (const [a, b, f] of segs) if (frame >= a && frame <= b) return f;
+  return null;
+}
+
+export function DoublesReplay2D({ rep }: { rep: DoublesReplay }) {
+  const [frame, setFrame] = useState(rep.f0);
+  const [playing, setPlaying] = useState(true);
+  const [speed, setSpeed] = useState(1);
+  const raf = useRef<number>(0);
+  const tPrev = useRef<number>(0);
+  const fRef = useRef<number>(rep.f0);
+
+  const byFrame = useMemo(() => {
+    const m = {} as Record<DSlot, Map<number, [number, number]>>;
+    for (const slot of Object.keys(rep.tracks) as DSlot[]) {
+      const mp = new Map<number, [number, number]>();
+      for (const [f, x, y] of rep.tracks[slot]) mp.set(f, [x, y]);
+      m[slot] = mp;
+    }
+    return m;
+  }, [rep]);
+
+  useEffect(() => {
+    fRef.current = rep.f0;
+    setFrame(rep.f0);
+    setPlaying(true);
+  }, [rep]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const step = (t: number) => {
+      if (!tPrev.current) tPrev.current = t;
+      const df = ((t - tPrev.current) / 1000) * rep.fps * speed;
+      tPrev.current = t;
+      fRef.current += df;
+      if (fRef.current >= rep.f1) fRef.current = rep.f0;
+      setFrame(Math.floor(fRef.current));
+      raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(raf.current);
+      tPrev.current = 0;
+    };
+  }, [playing, speed, rep]);
+
+  const pos = (slot: DSlot): [number, number] | null => {
+    for (let f = frame; f >= frame - 10; f--) {
+      const p = byFrame[slot]?.get(f);
+      if (p) return p;
+    }
+    return null;
+  };
+  const trail = (slot: DSlot) => rep.tracks[slot].filter(([f]) => f <= frame && f >= frame - 40);
+
+  // which slot of each side is currently the front (closest to net)
+  const frontOf = (side: DSide): DSlot | null => {
+    const [s0, s1] = SLOTS_OF[side];
+    const p0 = pos(s0), p1 = pos(s1);
+    if (!p0 || !p1) return p0 ? s0 : p1 ? s1 : null;
+    return Math.abs(p0[1] - NET) <= Math.abs(p1[1] - NET) ? s0 : s1;
+  };
+
+  return (
+    <div>
+      <svg {...svgProps} className="w-full">
+        <CourtLines />
+        {(["near", "far"] as DSide[]).map((side) => {
+          const color = SIDE_COLOR[side];
+          const front = frontOf(side);
+          return SLOTS_OF[side].map((slot, i) => {
+            const cur = pos(slot);
+            if (!cur) return null;
+            const isFront = slot === front;
+            const tr = trail(slot);
+            const label = initials(rep.names?.[slot], `${side[0].toUpperCase()}${i + 1}`);
+            return (
+              <g key={slot}>
+                <polyline
+                  points={tr.map(([, x, y]) => `${x * K},${y * K}`).join(" ")}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1.8}
+                  opacity={0.32}
+                  strokeLinecap="round"
+                />
+                <g transform={`translate(${cur[0] * K},${cur[1] * K})`}>
+                  <circle
+                    r={isFront ? 9 : 8}
+                    fill={isFront ? color : "var(--panel-solid)"}
+                    stroke={color}
+                    strokeWidth={isFront ? 1.2 : 2.4}
+                  />
+                  <text
+                    y={3.2}
+                    textAnchor="middle"
+                    fontSize={8.5}
+                    fontWeight={700}
+                    fill={isFront ? "var(--contact-ink)" : color}
+                  >
+                    {label}
+                  </text>
+                  {isFront && (
+                    <text y={-12} textAnchor="middle" fontSize={7} fill={color} className="mono">
+                      NET
+                    </text>
+                  )}
+                </g>
+              </g>
+            );
+          });
+        })}
+      </svg>
+
+      {/* formation banner */}
+      <div className="flex items-center gap-2 mt-2 mb-1">
+        {(["far", "near"] as DSide[]).map((side) => {
+          const f = formAt(rep.form[side], frame);
+          return (
+            <div
+              key={side}
+              className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-md border"
+              style={{ borderColor: "var(--line)" }}
+            >
+              <span className="mono text-[10px] tracking-[0.14em]" style={{ color: SIDE_COLOR[side] }}>
+                {side.toUpperCase()}
+              </span>
+              <span
+                className="mono text-[11px] tracking-[0.1em] font-semibold"
+                style={{ color: f === "attack" ? "var(--win)" : "var(--mut)" }}
+              >
+                {f ? f.toUpperCase() : "—"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <Controls
+        rep={rep}
+        frame={frame}
+        playing={playing}
+        speed={speed}
+        setPlaying={setPlaying}
+        setSpeed={setSpeed}
+        onScrub={(f) => {
+          setPlaying(false);
+          fRef.current = f;
+          setFrame(f);
+        }}
+      />
+    </div>
+  );
+}
+
+function Controls({
+  rep,
+  frame,
+  playing,
+  speed,
+  setPlaying,
+  setSpeed,
+  onScrub,
+}: {
+  rep: DoublesReplay;
+  frame: number;
+  playing: boolean;
+  speed: number;
+  setPlaying: (b: boolean) => void;
+  setSpeed: (n: number) => void;
+  onScrub: (f: number) => void;
+}) {
+  const pct = Math.round((100 * (frame - rep.f0)) / Math.max(1, rep.f1 - rep.f0));
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <button
+        onClick={() => setPlaying(!playing)}
+        className="mono text-[11px] px-2.5 py-1 rounded border border-[var(--line)] text-ink hover:border-[var(--mut)]"
+      >
+        {playing ? "❚❚" : "▶"}
+      </button>
+      {[0.5, 1, 2].map((s) => (
+        <button
+          key={s}
+          onClick={() => setSpeed(s)}
+          className="mono text-[10.5px] px-2 py-1 rounded border"
+          style={{
+            borderColor: speed === s ? "var(--mut)" : "var(--line)",
+            color: speed === s ? "var(--ink)" : "var(--dim)",
+          }}
+        >
+          {s}×
+        </button>
+      ))}
+      <input
+        type="range"
+        min={rep.f0}
+        max={rep.f1}
+        value={frame}
+        onChange={(e) => onScrub(Number(e.target.value))}
+        className="flex-1 accent-[var(--ai)] h-1"
+      />
+      <span className="mono text-[10.5px] text-dim w-10 text-right">{pct}%</span>
+    </div>
+  );
+}
+
+/** Horizontal attack/defence timeline for one side over a rally. */
+export function FormationTimeline({
+  segs,
+  f0,
+  f1,
+  color,
+}: {
+  segs: [number, number, Formation][];
+  f0: number;
+  f1: number;
+  color: string;
+}) {
+  const span = Math.max(1, f1 - f0);
+  return (
+    <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-[var(--line)]">
+      {segs.map(([a, b, f], i) => (
+        <div
+          key={i}
+          title={f}
+          style={{
+            width: `${(100 * (b - a + 1)) / span}%`,
+            background: f === "attack" ? color : "var(--line-soft)",
+            opacity: f === "attack" ? 0.9 : 1,
+          }}
+        />
+      ))}
+    </div>
+  );
+}

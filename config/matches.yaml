@@ -100,3 +100,47 @@ all_england_2022_sf:
   - -7.998469665831292e-05
   - 0.007484366783283409
   - 1.0
+wtf_2024_md_sf:
+  match_id: wtf_2024_md_sf
+  discipline: doubles
+  player_near: null
+  player_far: null
+  tournament: HSBC BWF World Tour Finals 2024
+  round: Semi-finals
+  result: 17-21 21-16 27-25
+  match_date: '2024-12-14'
+  players:
+  - Fajar Alfian / Muhammad Rian Ardianto
+  - Goh Sze Fei / Nur Izzuddin
+  video_url: https://www.youtube.com/watch?v=SRXM1E09gc0
+  video_path: data/raw/wtf_2024_md_sf.mp4
+  fps: 30.0
+  court_corners_px:
+  - - 239.25953674316406
+    - 685.9993286132812
+  - - 1034.2025146484375
+    - 683.99951171875
+  - - 840.4697265625
+    - 326.865966796875
+  - - 442.4995422363281
+    - 326.1501770019531
+  homography:
+  - 0.1489197801762916
+  - 0.08410873502283807
+  - -93.32901337305266
+  - -0.0009167484649881208
+  - -0.36441474053980866
+  - 250.2076081601349
+  - -0.00016610947288055416
+  - 0.02712168961071101
+  - 1.0
+  # Optional persistent-identity roster (see docs/DOUBLES.md). Per set: an anchor frame
+  # at the first serve + the 4 service-court quadrants -> player names. PLACEHOLDER names
+  # below (set by watching the anchor frame); demonstrates the schema a self-uploader fills.
+  doubles_identity:
+    1:
+      anchor_frame: 27654
+      near_left: Goh Sze Fei
+      near_right: Nur Izzuddin
+      far_left: Muhammad Rian Ardianto
+      far_right: Fajar Alfian
