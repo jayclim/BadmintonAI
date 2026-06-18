@@ -60,6 +60,27 @@ library; deploys to Vercel as pure static files):
 ![AI Lab — agreement vs human labels](docs/img/web_lab.jpg)
 ![Film room — AI-annotated rally clip](docs/img/web_film.jpg)
 
+## Doubles
+
+Doubles is a separate, deletable surface (route `/d/<id>`, its own manifest and
+components) so the proven singles chain stays untouched. There are no public doubles stroke
+labels and identical kit defeats appearance re-ID, so the doubles pipeline leans on
+**geometry and roles** instead of strokes: it tracks all four players (top-2 per court half,
+stable identity slots), then derives — purely from the tracks — **formation** (attack =
+front/back stack vs defence = side-by-side), **rotations**, per-player **net-hunting**,
+**movement** heatmaps, and a **label-free validation** showcase (≈93% all-4 in-rally
+coverage, identity stability, OCR parity). Five COURTSIDE views: Overview (+ rule-based
+scouting notes), Court, Patterns (formation flow), Film room (4-player 2D replay), AI Lab.
+
+The whole broadcast is tracked end to end, so the dashboard covers the **full multi-set
+match**: set boundaries are read from the scoreboard OCR and the pairs' end-swaps between
+games (and the deciding-game change at 11) are handled deterministically, so every stat
+aggregates per **team** across all three sets. Runbook + design:
+[`docs/DOUBLES.md`](docs/DOUBLES.md).
+
+> Still gated on stroke-level data: shot mix, response matrix, openings, error pressure —
+> these need 4-slot hit attribution (a Phase-1 item), not faked.
+
 ## Run it
 
 **Web dashboard** (all data + clips are committed — runs from a fresh clone):
@@ -132,6 +153,7 @@ debugged on ground truth before the vision pipeline existed.
 | Doc | Contents |
 |---|---|
 | [`HANDOFF.md`](HANDOFF.md) | single entry point: status, module map, the hard-won gotchas |
+| [`docs/DOUBLES.md`](docs/DOUBLES.md) | doubles workstream: 4-player tracking, formation/roles, full-match multi-set dashboard |
 | [`docs/ADD_A_MATCH.md`](docs/ADD_A_MATCH.md) | runbook: inject a new match (labeled or label-free) |
 | [`docs/DESIGN.md`](docs/DESIGN.md) · [`docs/SCHEMA.md`](docs/SCHEMA.md) | architecture & the two-tier data model |
 | [`docs/PHASE0_RESULTS.md`](docs/PHASE0_RESULTS.md) | tracking validation methodology + results |

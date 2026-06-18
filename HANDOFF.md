@@ -14,7 +14,41 @@ surfaces movement + tactics + pressure analytics, plus rally video clips (raw & 
 **Direction (locked):** controlled-capture eventually (any decent camera) · analytics
 dashboard first → tactical commentary later · singles first → doubles later.
 
-## 2. Current status (as of 2026-06-11)
+## 2. Current status (as of 2026-06-18)
+
+- **DOUBLES — FULL-MATCH, MULTI-SET DASHBOARD SHIPPED (2026-06-18).** The whole doubles
+  broadcast (`wtf_2024_md_sf`, 92.6 min) is now tracked end to end and the COURTSIDE doubles
+  surface (`/d/<id>`) covers the **full 3-set match**, per team, across the end-swaps.
+  - **Tracking:** `scripts/run_doubles_track.sh <id> 0 166650 20000` ran `doubles.track` over
+    all 166,650 frames in resumable 20k chunks (~4.5 h MPS @ ~10.5 fps → ~405k rows / 162k
+    frames). Each chunk writes at its end, so it's crash-resumable (re-run with the last
+    chunk's start; `process_video` DELETEs then INSERTs its range).
+  - **Multi-set correctness (the real work):** a match resets score + the pairs **swap ends**
+    each game (and again mid-decider at 11). `doubles/sets.py` (NEW, pure + unit-tested) reads
+    set boundaries from scoreboard-OCR score *totals* (order-invariant → survives swaps + the
+    8↔0 OCR confusion) and applies a deterministic side→pair map anchored on the set-1 roster
+    (pair **A** = set-1 near pair, **B** = far; swap per game, +1 at the decider's 11). Every
+    stat aggregates **per fixed team A/B**, not per court side.
+  - **Verified:** 3 sets detected (47/47/69 rallies, 163 total, 28.4 min rally time); decider
+    11-pt swap located at the right rally (set-3 near-pair flips A→B at rally 117); set-1 attack
+    split B 72% / A 39% matches who won set 1 (INA 21-17); coverage 93.5%. **Tests 33/33.**
+  - **Five doubles views** (all under `web/components/doubles/`, route slugs
+    overview/court/patterns/film/lab): Overview (+ rule-based scouting notes), Court (per-team
+    movement heatmaps), Patterns (formation flow), Film room (4-player 2D replay + rotation
+    markers), AI Lab (label-free validation showcase). Web is fully team-keyed
+    (`lib/doubles.ts` `Team="A"|"B"`, `TEAM_COLOR`); dot/timeline colours follow each team
+    through end-swaps. New backend: `doubles/{sets,movement,validate}.py`; `doubles/insights.py`
+    gained `formation_flow`.
+  - **Open / caveats:** rally segmentation is tracks-only → slightly over-segments (163 windows
+    vs ~127 actual points); per-player net-hunter only for roster-named sets (set 1 — add set
+    2/3 rosters to `matches.yaml` to extend); Points/momentum view + LLM coach notes deferred;
+    shot-level features still blocked on 4-slot hit attribution. Full detail: `docs/DOUBLES.md`.
+  - **Isolation held:** all changes under `doubles/` + tests/docs; singles dashboard untouched.
+    The working tree still carries pre-existing **unstaged singles edits that are not part of
+    this work** (`web/components/views/*`, `court.tsx`, `ui.tsx`, `fmt.ts`, `globals.css`,
+    `layout.tsx`, `Dashboard.tsx`, `charts.tsx`, `fetch_video.py`, `Dockerfile`/`.dockerignore`)
+    — leave them alone unless asked.
+
 - **LABEL-FREE COACH VIEW SHIPPED + NEW WEB APP (2026-06-11).** `labelfree.py` glues the
   whole CV chain (pipeline strokes `set_no=0` + scoreboard OCR events) into
   stroke_df/rally_df-compatible frames: snapshot at `data/labelfree/<id>.json` (built via

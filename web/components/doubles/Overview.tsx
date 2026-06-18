@@ -1,11 +1,48 @@
 "use client";
 
 import type { DoublesViewProps } from "@/components/DoublesDashboard";
-import type { DSide, FormationSide, PlayerShare } from "@/lib/doubles";
+import type { CoachNote, FormationSide, PlayerShare, Team } from "@/lib/doubles";
+import { TEAM_COLOR, TEAMS } from "@/lib/doubles";
 import { Card, Section, Metric, WatchBtn } from "@/components/ui";
 import { fmtClock } from "@/lib/fmt";
 
-const SIDE_COLOR: Record<DSide, string> = { near: "var(--pa)", far: "var(--pb)" };
+const NOTE_COLOR: Record<CoachNote["kind"], string> = {
+  good: "var(--win)",
+  watch: "var(--warn)",
+  info: "var(--ai)",
+};
+
+function CoachNotes({ notes }: { notes: CoachNote[] }) {
+  if (!notes || notes.length === 0) return null;
+  return (
+    <section>
+      <Section
+        kicker="AI SCOUTING NOTES"
+        title="What the tracking says"
+        hint="Rule-based reads off the formation, role and movement tactics — no labels, no LLM. Each note is a measured tendency a coach would act on."
+      />
+      <div className="grid sm:grid-cols-2 gap-3">
+        {notes.map((n, i) => {
+          const c = NOTE_COLOR[n.kind];
+          return (
+            <Card key={i} delay={(Math.min(i + 1, 3)) as 1} className="border-l-2" >
+              <div className="flex items-center gap-2 mb-1.5">
+                <span
+                  className="mono text-[9px] tracking-[0.16em] px-1.5 py-0.5 rounded"
+                  style={{ color: c, background: "color-mix(in srgb, " + c + " 14%, transparent)" }}
+                >
+                  {n.kind.toUpperCase()}
+                </span>
+                <span className="font-semibold text-[13.5px]">{n.head}</span>
+              </div>
+              <p className="text-[12.5px] text-mut leading-snug">{n.body}</p>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 /** attack(left) vs defence(right) split bar */
 function AttackBar({ attackPct, color }: { attackPct: number | null; color: string }) {
@@ -24,15 +61,15 @@ function AttackBar({ attackPct, color }: { attackPct: number | null; color: stri
   );
 }
 
-function SideCard({ side, f, pair }: { side: DSide; f: FormationSide; pair: string }) {
-  const color = SIDE_COLOR[side];
+function SideCard({ team, f, pair }: { team: Team; f: FormationSide; pair: string }) {
+  const color = TEAM_COLOR[team];
   return (
     <Card>
       <div className="flex items-baseline justify-between gap-2">
         <div className="font-semibold text-[1.05rem]" style={{ color }}>
           {pair}
         </div>
-        <span className="mono text-[10px] tracking-[0.16em] text-dim">{side.toUpperCase()}</span>
+        <span className="mono text-[10px] tracking-[0.16em] text-dim">TEAM {team}</span>
       </div>
       <AttackBar attackPct={f.attackPct} color={color} />
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-4">
@@ -60,7 +97,7 @@ function NetHunters({ players, color }: { players: PlayerShare[]; color: string 
   return (
     <div className="space-y-3">
       {sorted.map((p) => (
-        <div key={p.slot}>
+        <div key={`${p.set}-${p.slot}`}>
           <div className="flex items-baseline justify-between text-[13px] mb-1">
             <span className="font-medium" style={{ color }}>
               {p.name}
@@ -77,21 +114,26 @@ function NetHunters({ players, color }: { players: PlayerShare[]; color: string 
 }
 
 export default function DoublesOverview({ d, goRally }: DoublesViewProps) {
-  const { formation, players, rallies, meta } = d;
-  const nearPlayers = players.filter((p) => p.side === "near");
-  const farPlayers = players.filter((p) => p.side === "far");
+  const { formation, players, rallies, meta, notes } = d;
+  const multiSet = meta.nSets > 1;
 
   return (
     <div className="space-y-8 mt-2">
+      <CoachNotes notes={notes} />
+
       <section>
         <Section
           kicker="FORMATION"
           title="Attack vs defence"
-          hint="Attack = the pair stacked front-to-back (one hunts the net, partner covers the rear). Defence = side-by-side, receiving a smash. Rotations count debounced flips between the two."
+          hint={
+            "Attack = the pair stacked front-to-back (one hunts the net, partner covers the rear). Defence = side-by-side, receiving a smash. Rotations count debounced flips between the two." +
+            (multiSet ? " Aggregated across all sets — pairs swap ends each game, so stats follow the team, not the court side." : "")
+          }
         />
         <div className="grid md:grid-cols-2 gap-5">
-          <SideCard side="near" f={formation.near} pair={meta.pairs.near} />
-          <SideCard side="far" f={formation.far} pair={meta.pairs.far} />
+          {TEAMS.map((t) => (
+            <SideCard key={t} team={t} f={formation[t]} pair={meta.teams[t]} />
+          ))}
         </div>
       </section>
 
@@ -100,21 +142,17 @@ export default function DoublesOverview({ d, goRally }: DoublesViewProps) {
           <Section
             kicker="ROLES"
             title="Who hunts the net"
-            hint="Share of in-rally frames each player spent as the front (net) player of their pair. The net player attacks; their partner covers the rear."
+            hint={`Share of in-rally frames each player spent as the front (net) player of their pair${multiSet ? " — computed for the roster-named set(s)" : ""}. The net player attacks; their partner covers the rear.`}
           />
           <div className="grid md:grid-cols-2 gap-5">
-            <Card>
-              <div className="font-semibold mb-3" style={{ color: SIDE_COLOR.near }}>
-                {meta.pairs.near}
-              </div>
-              <NetHunters players={nearPlayers} color={SIDE_COLOR.near} />
-            </Card>
-            <Card>
-              <div className="font-semibold mb-3" style={{ color: SIDE_COLOR.far }}>
-                {meta.pairs.far}
-              </div>
-              <NetHunters players={farPlayers} color={SIDE_COLOR.far} />
-            </Card>
+            {TEAMS.map((t) => (
+              <Card key={t}>
+                <div className="font-semibold mb-3" style={{ color: TEAM_COLOR[t] }}>
+                  {meta.teams[t]}
+                </div>
+                <NetHunters players={players.filter((p) => p.team === t)} color={TEAM_COLOR[t]} />
+              </Card>
+            ))}
           </div>
         </section>
       )}
@@ -123,29 +161,31 @@ export default function DoublesOverview({ d, goRally }: DoublesViewProps) {
         <Section
           kicker="RALLIES"
           title={`${rallies.length} tracked rallies`}
-          hint="Per-rally formation split for each side. Click to watch the 4-player replay."
+          hint="Per-rally attack share for each team. Click to watch the 4-player replay."
         />
         <Card className="!p-0 overflow-hidden">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="text-left text-dim mono text-[10px] tracking-[0.1em] border-b border-[var(--line-soft)]">
                 <th className="px-4 py-2.5">#</th>
+                {multiSet && <th className="px-4 py-2.5">SET</th>}
                 <th className="px-4 py-2.5">LENGTH</th>
-                <th className="px-4 py-2.5" style={{ color: SIDE_COLOR.near }}>NEAR ATTACK</th>
-                <th className="px-4 py-2.5" style={{ color: SIDE_COLOR.far }}>FAR ATTACK</th>
+                <th className="px-4 py-2.5" style={{ color: TEAM_COLOR.A }}>{meta.teams.A.split(" / ")[0]} ATTACK</th>
+                <th className="px-4 py-2.5" style={{ color: TEAM_COLOR.B }}>{meta.teams.B.split(" / ")[0]} ATTACK</th>
                 <th className="px-4 py-2.5">ROTATIONS</th>
                 <th className="px-4 py-2.5"></th>
               </tr>
             </thead>
             <tbody>
               {rallies.map((r) => {
-                const rot = (r.near?.rotations ?? 0) + (r.far?.rotations ?? 0);
+                const rot = (r.A?.rotations ?? 0) + (r.B?.rotations ?? 0);
                 return (
                   <tr key={r.rally} className="border-b border-[var(--line-soft)] last:border-0 hover:bg-[var(--panel-solid)]/40">
                     <td className="px-4 py-2.5 mono text-mut">{r.rally}</td>
+                    {multiSet && <td className="px-4 py-2.5 mono text-dim">{r.set}</td>}
                     <td className="px-4 py-2.5 mono text-dim">{fmtClock(r.durS)}</td>
-                    <td className="px-4 py-2.5"><MiniBar pct={r.near?.attackPct ?? null} color={SIDE_COLOR.near} /></td>
-                    <td className="px-4 py-2.5"><MiniBar pct={r.far?.attackPct ?? null} color={SIDE_COLOR.far} /></td>
+                    <td className="px-4 py-2.5"><MiniBar pct={r.A?.attackPct ?? null} color={TEAM_COLOR.A} /></td>
+                    <td className="px-4 py-2.5"><MiniBar pct={r.B?.attackPct ?? null} color={TEAM_COLOR.B} /></td>
                     <td className="px-4 py-2.5 mono text-mut">{rot}</td>
                     <td className="px-4 py-2.5 text-right">
                       <WatchBtn n={1} onClick={() => goRally(r.rally)} />

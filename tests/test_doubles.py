@@ -18,7 +18,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from badminton.doubles import identity, insights, roles, segment, smooth  # noqa: E402
+from badminton.doubles import identity, insights, movement, roles, segment, sets, smooth  # noqa: E402
 from badminton.doubles.track import REID_RADIUS_M, SlotAssigner, _Det  # noqa: E402
 
 _DUMMY = np.zeros((17, 2)), np.zeros(17), np.zeros(4)  # kxy, kcf, box stand-ins
@@ -208,6 +208,150 @@ def test_count_switches():
     assert insights._count_switches(["near", "near", "near"]) == 0
     assert insights._count_switches([]) == 0
     assert insights._count_switches(["a", "b", "a", "b"]) == 3
+
+
+def _set_totals(end_a, end_b):
+    """Synthetic per-rally totals for one game ending end_a-end_b (1 point added/rally)."""
+    return list(range(1, end_a + end_b + 1))
+
+
+def test_assign_sets_three_game_match():
+    """Set boundaries from score-total resets across a real 3-game line (17-21/21-16/27-25)."""
+    totals = _set_totals(17, 21) + _set_totals(21, 16) + _set_totals(27, 25)
+    s = sets.assign_sets(totals)
+    assert s[0] == 1 and s[-1] == 3
+    # the first rally of game 2 is right after the 38-total game-1 finale
+    assert s[len(_set_totals(17, 21))] == 2
+    assert s[len(_set_totals(17, 21)) + len(_set_totals(21, 16))] == 3
+    assert max(s) == 3
+
+
+def test_assign_sets_tolerates_dropped_reads():
+    """A None (unreadable) rally inherits the running set and never invents a boundary."""
+    totals = [1, 2, None, 4, 38, 1, 2]          # one reset after the 38
+    s = sets.assign_sets(totals)
+    assert s == [1, 1, 1, 1, 1, 2, 2]
+    # an 8->0 misread mid-game (e.g. 18->10) must NOT trigger a reset (10 > SET_RESET_MAX)
+    assert sets.assign_sets([16, 18, 10, 19]) == [1, 1, 1, 1]
+
+
+def test_side_pair_map_end_swaps():
+    """Ends swap each game; the deciding game swaps once more at 11."""
+    assert sets.side_pair_map(1) == {"near": "A", "far": "B"}
+    assert sets.side_pair_map(2) == {"near": "B", "far": "A"}
+    assert sets.side_pair_map(3) == {"near": "A", "far": "B"}          # before 11
+    assert sets.side_pair_map(3, post_deciding_swap=True) == {"near": "B", "far": "A"}
+    # only the deciding (3rd) game has the mid-set swap
+    assert sets.side_pair_map(2, post_deciding_swap=True) == {"near": "B", "far": "A"}
+
+
+def test_deciding_swap_frame_at_eleven():
+    """The mid-game change of ends is located at the rally where a side first hits 11."""
+    rows = [(0, 99, 5, 3), (100, 199, 9, 8), (200, 299, 11, 9), (300, 399, 12, 10)]
+    assert sets.deciding_swap_frame(rows) == 199 + 100  # end frame of the 11-9 rally (299)
+    assert sets.deciding_swap_frame([(0, 50, 3, 4)]) is None
+
+
+def test_rally_sides_full_structure():
+    """End-to-end pure assembly: each rally tagged with set + which pair is near/far.
+    Each game must end high (>=18 total) before the next resets — as in real play."""
+    rs = [(0, 99, 19, 21),                             # game 1 ends high (total 40)
+          (100, 199, 1, 0), (200, 299, 19, 21),        # game 2: reset -> climbs high
+          (300, 399, 0, 1),                            # game 3: reset
+          (400, 499, 11, 5),                           # game 3 hits 11 -> swap after f499
+          (500, 599, 12, 5)]                           # game 3 post-swap
+    out = sets.rally_sides(rs)
+    setseq = [r["set"] for r in out]
+    assert setseq == [1, 2, 2, 3, 3, 3]
+    assert out[0]["near_pair"] == "A" and out[0]["far_pair"] == "B"   # game 1
+    assert out[1]["near_pair"] == "B"                                  # game 2 swapped
+    assert out[3]["near_pair"] == "A"                                  # game 3 pre-11
+    assert out[5]["near_pair"] == "B"                                  # game 3 post-11 swap
+
+
+def test_coach_notes_lopsided_attack():
+    """Coach notes flag a clearly lopsided attack share, naming the dominant TEAM."""
+    from badminton.doubles import export_web
+    teams = {"A": "A / B", "B": "C / D"}
+    flow = {
+        "A": {"attackPct": 30, "attackFirstPct": 20, "attackHoldMedS": 1.2,
+              "rotPerMin": 12, "rallies": 5},
+        "B": {"attackPct": 80, "attackFirstPct": 100, "attackHoldMedS": 3.1,
+              "rotPerMin": 14, "rallies": 5},
+    }
+    notes = export_web._coach_notes(teams, {}, flow, [])
+    assert any(n["kind"] == "watch" and "lopsided" in n["head"].lower() for n in notes)
+    lop = next(n for n in notes if "lopsided" in n["head"].lower())
+    assert "C / D" in lop["body"]                    # names the dominant team
+    # team B sustains attack (>=2.5s) AND team A loses it fast (<=1.5s)
+    assert any(n["kind"] == "good" and "C / D" in n["head"] for n in notes)
+    assert any(n["kind"] == "watch" and "quickly" in n["head"].lower() for n in notes)
+
+
+def test_coach_notes_even_attack_no_false_alarm():
+    """A balanced attack share yields the neutral 'evenly contested' note, not a warning."""
+    from badminton.doubles import export_web
+    teams = {"A": "A / B", "B": "C / D"}
+    flow = {
+        "A": {"attackPct": 52, "attackFirstPct": 50, "attackHoldMedS": 2.0,
+              "rotPerMin": 10, "rallies": 5},
+        "B": {"attackPct": 48, "attackFirstPct": 50, "attackHoldMedS": 2.0,
+              "rotPerMin": 10, "rallies": 5},
+    }
+    notes = export_web._coach_notes(teams, {}, flow, [])
+    assert any("evenly contested" in n["head"].lower() for n in notes)
+    assert not any("lopsided" in n["head"].lower() for n in notes)
+
+
+def test_form_segments_runlength():
+    """Formation flow: debounced attack/defence runs, sorted, with clean empty handling."""
+    import pandas as pd
+    # margin = depth_gap - lateral_gap; +ve clears the band → attack, −ve → defence
+    df = pd.DataFrame({"frame_num": [10, 11, 12, 13, 14],
+                       "depth_gap": [2.0, 2.0, 2.0, 0.0, 0.0],
+                       "lateral_gap": [0.0, 0.0, 0.0, 2.0, 2.0]})
+    assert insights._form_segments(df) == [[10, 12, "attack"], [13, 14, "defence"]]
+    assert insights._form_segments(df.iloc[::-1]) == [[10, 12, "attack"], [13, 14, "defence"]]
+    assert insights._form_segments(df.iloc[0:0]) == []
+
+
+def test_movement_near_slot_passthrough():
+    """Near slots already live on the near half — normalisation must leave them untouched."""
+    P = np.array([[1.0, 2.0], [4.0, 5.5]])
+    assert np.allclose(movement._to_near_half(P, "near"), P)
+    assert np.allclose(movement._to_near_half(P, "near2"), P)
+
+
+def test_movement_far_slot_mirrors_onto_near_half():
+    """Far slots flip across centre (x->W-x, y->L-y) so a far net-player lands NEAR the net."""
+    W, L, NET = movement.W, movement.L, movement.NET
+    far_at_net = np.array([[1.0, NET + 0.3]])             # just over the net, far side
+    out = movement._to_near_half(far_at_net, "far")
+    assert np.allclose(out, [[W - 1.0, L - (NET + 0.3)]])
+    assert abs(out[0, 1] - NET) < 0.5                     # mirrored y sits close to the net
+    # a far baseline player maps to small y (own baseline → REAR), not negative/out of court
+    base = movement._to_near_half(np.array([[3.0, L - 0.2]]), "far2")
+    assert 0.0 <= base[0, 1] <= NET / 3                   # deep = REAR band
+
+
+def test_movement_reach_and_grid_constants():
+    """Court-control grid spans one half and the reach is a sane racket+lunge radius."""
+    nx, ny = movement.CTRL_GRID
+    assert nx > 0 and ny > 0
+    assert 1.0 <= movement.REACH_M <= 2.5            # racket + lunge, not a teleport
+    # the grid's y extent is the half court (cell centres live in (0, NET))
+    ys = (np.arange(ny) + 0.5) / ny * movement.NET
+    assert ys.min() > 0 and ys.max() < movement.NET
+
+
+def test_movement_heat_shape_and_binning():
+    """_heat matches the singles HeatMap contract (bins/extent) and counts every point."""
+    P = np.array([[0.1, 0.1], [0.2, 0.2], [movement.W - 0.1, movement.NET]])
+    h = movement._heat(P)
+    assert (h["nx"], h["ny"]) == movement.HEAT_BINS
+    assert h["x1"] == movement.W and h["y1"] == movement.NET + 0.5
+    assert sum(c[2] for c in h["cells"]) == len(P)        # no point dropped
+    assert all(0 <= i < h["nx"] and 0 <= j < h["ny"] for i, j, _ in h["cells"])
 
 
 def _run() -> int:

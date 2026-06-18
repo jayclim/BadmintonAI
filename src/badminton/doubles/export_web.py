@@ -36,7 +36,7 @@ import pandas as pd
 
 from .. import config, court, db
 from . import identity as _identity
-from . import insights, roles, segment
+from . import insights, movement, roles, segment, sets, validate
 
 OUT_DEFAULT = config.REPO_ROOT / "web" / "public" / "data"
 DOUBLES_INDEX = "doubles_index.json"
@@ -95,27 +95,55 @@ def _pairs(match_id: str, m: dict, set_no: int = 1) -> dict[str, str]:
             "far": players[0] if players else "Far pair"}
 
 
+# ------------------------------------------------------------------ teams / set structure
+
+def _teams(match_id: str, m: dict) -> dict[str, str]:
+    """Fixed team labels A/B for the whole match. A := the pair that started on the NEAR
+    end in set 1, B := the far pair (matching sets.side_pair_map's anchor)."""
+    p = _pairs(match_id, m, 1)
+    return {"A": p["near"], "B": p["far"]}
+
+
+def _rally_sides(match_id: str, windows, fps: float) -> list[dict]:
+    """Per-rally set + which team (A/B) is on near/far, aligned 1:1 to `windows`.
+
+    Uses sets.analyze (scoreboard OCR). If OCR/sets can't be resolved, falls back to a
+    single set with the set-1 orientation (near=A, far=B) so a tracked-but-unread match
+    still exports sensibly."""
+    try:
+        rs = sets.analyze(match_id, windows=windows)
+    except Exception as e:  # OCR/scoreboard failure must not break the whole export
+        print(f"  note: set detection failed ({e}); treating as a single set")
+        rs = None
+    if rs and len(rs) == len(windows):
+        return [{"set": r["set"], "nearPair": r["near_pair"], "farPair": r["far_pair"],
+                 "total": r["total"]} for r in rs]
+    return [{"set": 1, "nearPair": "A", "farPair": "B", "total": None} for _ in windows]
+
+
 # ------------------------------------------------------------------ tactics tables
 
-def _rally_table(match_id: str, windows, max_gap: int, min_len: int) -> list[dict]:
-    """Per rally: frames/time + each side's attack share, rotations, front-swaps.
-
-    `insights.rally_report` is computed on the SAME windows (same max_gap/min_len), so
-    its 1-based `rally` index lines up with `windows[rally-1]`."""
+def _rally_table(match_id: str, windows, rsides: list[dict],
+                 max_gap: int, min_len: int) -> list[dict]:
+    """Per rally: frames/time, its real SET, which team is near/far, and each TEAM's attack
+    share / rotations / front-swaps. The geometric near/far stats are mapped to teams A/B
+    via the per-rally side→pair map, so a rally in set 2 (ends swapped) credits the right
+    team. `insights.rally_report` shares the windows, so its 1-based rally index aligns."""
     rr = insights.rally_report(match_id, max_gap, min_len)
     fps = float(config.get_match(match_id)["fps"])
     out = []
     for i, (a, b) in enumerate(windows, 1):
-        row: dict = {"rally": i, "set": 1, "f0": int(a), "f1": int(b),
+        rsi = rsides[i - 1]
+        row: dict = {"rally": i, "set": rsi["set"], "f0": int(a), "f1": int(b),
                      "t0": round(a / fps, 2), "t1": round(b / fps, 2),
-                     "durS": round((b - a + 1) / fps, 2), "frames": int(b - a + 1)}
-        for side in ("near", "far"):
+                     "durS": round((b - a + 1) / fps, 2), "frames": int(b - a + 1),
+                     "nearPair": rsi["nearPair"], "farPair": rsi["farPair"],
+                     "A": None, "B": None}
+        for side, team in (("near", rsi["nearPair"]), ("far", rsi["farPair"])):
             sr = rr[(rr.rally == i) & (rr.side == side)]
-            if sr.empty:
-                row[side] = None
-            else:
+            if not sr.empty:
                 r0 = sr.iloc[0]
-                row[side] = {"attackPct": float(r0["attack_%"]),
+                row[team] = {"attackPct": float(r0["attack_%"]),
                              "rotations": int(r0["rotations"]),
                              "frontSwaps": int(r0["front_swaps"]),
                              "frames": int(r0["frames"])}
@@ -123,64 +151,171 @@ def _rally_table(match_id: str, windows, max_gap: int, min_len: int) -> list[dic
     return out
 
 
-def _formation_summary(match_id: str, windows, rally_rows: list[dict]) -> dict:
-    """Per-side match-span summary: frame-weighted attack share, summed rotations/
-    front-swaps (from the rally rows), and median depth/lateral gaps over in-rally
-    frames only (so dead-time geometry never leaks in)."""
+def _team_gaps(match_id: str, windows, rsides: list[dict]) -> dict[str, dict[int, list]]:
+    """Per team -> {'depth': [...], 'lateral': [...]} of in-rally role-geometry gaps, with
+    each rally's near/far rows attributed to the team that occupied that side that rally."""
     rd = roles.roles_df(match_id)
-    in_rally = pd.concat([rd[(rd.frame_num >= a) & (rd.frame_num <= b)] for a, b in windows]) \
-        if windows and not rd.empty else rd.iloc[0:0]
+    acc = {"A": {"depth": [], "lateral": []}, "B": {"depth": [], "lateral": []}}
+    if rd.empty:
+        return acc
+    for (a, b), rsi in zip(windows, rsides):
+        seg = rd[(rd.frame_num >= a) & (rd.frame_num <= b)]
+        for side, team in (("near", rsi["nearPair"]), ("far", rsi["farPair"])):
+            g = seg[seg.side == side]
+            if not g.empty:
+                acc[team]["depth"].extend(g.depth_gap.tolist())
+                acc[team]["lateral"].extend(g.lateral_gap.tolist())
+    return acc
+
+
+def _formation_for(rows: list[dict], gaps: dict) -> dict:
+    """Per-team formation block from team-keyed rally rows + accumulated gap samples."""
     out = {}
-    for side in ("near", "far"):
-        sides = [r[side] for r in rally_rows if r.get(side)]
+    for team in ("A", "B"):
+        sides = [r[team] for r in rows if r.get(team)]
         frames = sum(s["frames"] for s in sides)
         attack = (sum(s["attackPct"] * s["frames"] for s in sides) / frames) if frames else None
-        g = in_rally[in_rally.side == side]
-        out[side] = {
+        d, lat = gaps[team]["depth"], gaps[team]["lateral"]
+        out[team] = {
             "frames": frames,
             "attackPct": round(attack, 1) if attack is not None else None,
             "defencePct": round(100 - attack, 1) if attack is not None else None,
             "rotations": sum(s["rotations"] for s in sides),
             "frontSwaps": sum(s["frontSwaps"] for s in sides),
-            "medianDepthGapM": round(float(np.median(g.depth_gap)), 2) if not g.empty else None,
-            "medianLateralGapM": round(float(np.median(g.lateral_gap)), 2) if not g.empty else None,
+            "medianDepthGapM": round(float(np.median(d)), 2) if d else None,
+            "medianLateralGapM": round(float(np.median(lat)), 2) if lat else None,
         }
     return out
 
 
-def _player_table(match_id: str, set_no: int, max_gap: int, min_len: int) -> list[dict]:
-    """Per named player: front-court share + which side, when a roster is set."""
-    pr = insights.player_report(match_id, set_no, max_gap, min_len)
-    if pr is None or pr.empty:
+def _formation_summary(match_id: str, windows, rally_rows: list[dict],
+                       rsides: list[dict]) -> tuple[dict, list[dict]]:
+    """Per-TEAM match-span summary + per-set breakdown. Attack/rotations/front-swaps come
+    from the team-keyed rally rows; median depth/lateral gaps from in-rally role geometry
+    attributed to the team that held each side that rally."""
+    gaps = _team_gaps(match_id, windows, rsides)
+    total = _formation_for(rally_rows, gaps)
+
+    by_set = []
+    set_nos = sorted({r["set"] for r in rally_rows})
+    for sn in set_nos:
+        idx = [i for i, r in enumerate(rally_rows) if r["set"] == sn]
+        sub_rows = [rally_rows[i] for i in idx]
+        sub_win = [windows[i] for i in idx]
+        sub_rs = [rsides[i] for i in idx]
+        by_set.append({"set": sn,
+                       **_formation_for(sub_rows, _team_gaps(match_id, sub_win, sub_rs))})
+    return total, by_set
+
+
+def _player_table(match_id: str, windows, rsides: list[dict]) -> list[dict]:
+    """Per named player: front-court share, computed SET-BY-SET and restricted to that set's
+    rallies (so a roster only ever names the slots in the set it was anchored on). Only sets
+    with a `doubles_identity` roster contribute — others are skipped rather than mislabeled
+    by a swapped-end roster. Each row carries its set + the team (A/B) that side belonged to."""
+    roster = config.get_match(match_id).get("doubles_identity") or {}
+    rd = roles.roles_df(match_id)
+    if rd.empty:
         return []
-    side_of = {"near": "near", "near2": "near", "far": "far", "far2": "far"}
-    return [{"name": r["player"], "slot": r["slot"], "side": side_of[r["slot"]],
-             "frontPct": float(r["front_%"]), "frames": int(r["frames"])}
-            for _, r in pr.iterrows()]
+    out = []
+    for sn in sorted({r["set"] for r in rsides}):
+        if not (roster.get(sn) or roster.get(str(sn))):
+            continue
+        try:
+            slot_name = _identity.resolve(match_id, sn)
+        except SystemExit:
+            continue
+        idx = [i for i, rs in enumerate(rsides) if rs["set"] == sn]
+        sub = pd.concat([rd[(rd.frame_num >= windows[i][0]) & (rd.frame_num <= windows[i][1])]
+                         for i in idx]) if idx else rd.iloc[0:0]
+        smap = sets.side_pair_map(sn)
+        for side, slots in (("near", ("near", "near2")), ("far", ("far", "far2"))):
+            s = sub[sub.side == side]
+            if s.empty:
+                continue
+            n = len(s)
+            for slot in slots:
+                out.append({"name": slot_name.get(slot, slot), "slot": slot,
+                            "side": side, "set": sn, "team": smap[side],
+                            "frontPct": round(100 * float((s.front == slot).mean())),
+                            "frames": int(n)})
+    return out
+
+
+def _movement_table(match_id: str, fps: float, teams: dict,
+                    rally_full: list[dict]) -> list[dict]:
+    """Per-TEAM movement across the whole match (distance/speed/coverage, front/mid/back,
+    positional heat), each pair's two players combined onto one near half so it's swap-safe
+    across sets. One entry per team, named from the fixed team labels."""
+    mv = movement.team_movement(match_id, fps, rally_full)
+    out = []
+    for team in ("A", "B"):
+        m = mv.get(team)
+        if not m:
+            continue
+        out.append({"name": teams[team], **m})
+    return out
+
+
+# ------------------------------------------------------------------ formation flow
+
+def _flow_table(match_id: str, fps: float, rsides: list[dict],
+                max_gap: int, min_len: int) -> dict:
+    """Per-TEAM formation-flow aggregates + per-rally attack/defence segments. The geometric
+    near/far segments are credited to the team that held that side each rally (so the flow
+    survives end-swaps). `insights.formation_flow` shares the windows, so rally index aligns."""
+    flow = insights.formation_flow(match_id, max_gap, min_len)
+    agg = {t: {"attack_first": 0, "defence_first": 0, "rallies": 0, "a2d": 0, "d2a": 0,
+               "rotations": 0, "attack_frames": 0, "total_frames": 0, "holds": []}
+           for t in ("A", "B")}
+    out_rallies = []
+    for r in flow["rallies"]:
+        a, b = r["f0"], r["f1"]
+        rsi = rsides[r["rally"] - 1] if r["rally"] - 1 < len(rsides) else {"set": 1, "nearPair": "A", "farPair": "B"}
+        out_rallies.append({"rally": r["rally"], "set": rsi["set"], "f0": a, "f1": b,
+                            "durS": round((b - a + 1) / fps, 1),
+                            "nearPair": rsi["nearPair"], "farPair": rsi["farPair"],
+                            "near": r["near"], "far": r["far"]})
+        for side, team in (("near", rsi["nearPair"]), ("far", rsi["farPair"])):
+            segs = r[side]
+            if not segs:
+                continue
+            g = agg[team]
+            g["rallies"] += 1
+            g["attack_first" if segs[0][2] == "attack" else "defence_first"] += 1
+            for s0, s1, lab in segs:
+                dur = s1 - s0 + 1
+                g["total_frames"] += dur
+                if lab == "attack":
+                    g["attack_frames"] += dur
+                    g["holds"].append(dur)
+            for x, y in zip(segs, segs[1:]):
+                g["a2d"] += x[2] == "attack" and y[2] == "defence"
+                g["d2a"] += x[2] == "defence" and y[2] == "attack"
+            g["rotations"] += len(segs) - 1
+    teams = {}
+    for team in ("A", "B"):
+        g = agg[team]
+        n = g["rallies"]
+        mins = g["total_frames"] / fps / 60 if g["total_frames"] else 0
+        holds = g["holds"]
+        teams[team] = {
+            "rallies": n,
+            "attackFirst": g["attack_first"], "defenceFirst": g["defence_first"],
+            "attackFirstPct": round(100 * g["attack_first"] / n) if n else None,
+            "attackPct": round(100 * g["attack_frames"] / g["total_frames"]) if g["total_frames"] else None,
+            "attackHoldMedS": round(float(np.median(holds)) / fps, 1) if holds else None,
+            "rotPerRally": round(g["rotations"] / n, 1) if n else None,
+            "rotPerMin": round(g["rotations"] / mins, 1) if mins else None,
+            "a2d": g["a2d"], "d2a": g["d2a"],
+        }
+    return {"A": teams["A"], "B": teams["B"], "rallies": out_rallies}
 
 
 # ------------------------------------------------------------------ per-rally replay
 
-def _form_segments(rd_side: pd.DataFrame) -> list[list]:
-    """Run-length [startFrame, endFrame, 'attack'|'defence'] of the DEBOUNCED formation
-    (Schmitt-triggered, matching roles/render) for one side over its sorted rows."""
-    s = rd_side.sort_values("frame_num")
-    if s.empty:
-        return []
-    labels = roles.hysteresis_formation((s.depth_gap - s.lateral_gap).tolist())
-    frames = s.frame_num.tolist()
-    segs, start, cur, prev = [], frames[0], labels[0], frames[0]
-    for f, lab in zip(frames[1:], labels[1:]):
-        if lab != cur:
-            segs.append([int(start), int(prev), cur])
-            start, cur = f, lab
-        prev = f
-    segs.append([int(start), int(frames[-1]), cur])
-    return segs
-
-
 def _export_replay(match_id: str, rally_no: int, a: int, b: int, fps: float,
-                   pairs: dict, names: dict | None, rd: pd.DataFrame, out: Path) -> None:
+                   teams: dict, rsi: dict, rd: pd.DataFrame, out: Path) -> None:
     con = db.connect(read_only=True)
     rows = con.execute(
         "SELECT frame_num, player_id, court_x, court_y FROM tracks WHERE match_id=? "
@@ -193,11 +328,78 @@ def _export_replay(match_id: str, rally_no: int, a: int, b: int, fps: float,
             tracks[pid].append([int(f), round(float(x), 2), round(float(y), 2)])
 
     seg = rd[(rd.frame_num >= a) & (rd.frame_num <= b)]
-    form = {side: _form_segments(seg[seg.side == side]) for side in ("near", "far")}
+    form = {side: insights._form_segments(seg[seg.side == side]) for side in ("near", "far")}
 
+    # which team is on each side this rally → the web colours dots by team, not court side
+    pairs = {"near": teams[rsi["nearPair"]], "far": teams[rsi["farPair"]]}
     _write(out / match_id / "dreplay" / f"r{rally_no}.json", dict(
-        fps=fps, f0=int(a), f1=int(b), rally=rally_no, set=1,
-        pairs=pairs, names=names, tracks=tracks, form=form))
+        fps=fps, f0=int(a), f1=int(b), rally=rally_no, set=rsi["set"],
+        nearPair=rsi["nearPair"], farPair=rsi["farPair"],
+        pairs=pairs, names=None, tracks=tracks, form=form))
+
+
+# ------------------------------------------------------------------ coach notes
+
+def _coach_notes(teams: dict, formation: dict, flow: dict, players: list) -> list[dict]:
+    """Rule-based, doubles-tailored scouting notes from the already-computed per-TEAM
+    tactics (no extra DB work). Honest and small: each note states a measured tendency a
+    coach would act on. `kind` colours it (good/watch/info) in the web."""
+    notes: list[dict] = []
+
+    def note(kind, head, body):
+        notes.append({"kind": kind, "head": head, "body": body})
+
+    fa, fb = flow["A"], flow["B"]
+
+    # 1) attack control — who seizes and holds the offence
+    if fa["attackPct"] is not None and fb["attackPct"] is not None:
+        dom, oth = ("A", "B") if fa["attackPct"] >= fb["attackPct"] else ("B", "A")
+        d, o = flow[dom], flow[oth]
+        gap = abs(fa["attackPct"] - fb["attackPct"])
+        if gap >= 12:
+            note("watch", "Attack control is lopsided",
+                 f"{teams[dom]} held the attacking formation {d['attackPct']}% of tracked "
+                 f"frames vs {o['attackPct']}% for {teams[oth]}"
+                 + (f", and seized it first in {d['attackFirstPct']}% of rallies" if d.get("attackFirstPct") is not None else "")
+                 + f". {teams[oth]} need to win the first exchange to get off defence.")
+        else:
+            note("info", "Attack was evenly contested",
+                 f"Both pairs held the offence a similar share of the time "
+                 f"({teams['A']} {fa['attackPct']}% · {teams['B']} {fb['attackPct']}%).")
+
+    # 2) attack hold length — sustaining vs trading the offence
+    for team in ("A", "B"):
+        h = flow[team].get("attackHoldMedS")
+        if h is not None and flow[team]["rallies"] >= 3:
+            if h >= 2.5:
+                note("good", f"{teams[team]} sustain the attack",
+                     f"Median {h:.1f}s of continuous attacking before being rotated off — "
+                     f"they keep the pressure on rather than trading it back.")
+            elif h <= 1.5:
+                note("watch", f"{teams[team]} lose the attack quickly",
+                     f"Median attack lasts only {h:.1f}s before they're forced back to "
+                     f"defence — the rear player isn't getting time to step in.")
+
+    # 3) net hunter — clearest front-court specialist (within a roster-named set)
+    if players:
+        top = max(players, key=lambda p: p["frontPct"])
+        if top["frontPct"] >= 60:
+            mate = next((p for p in players if p.get("set") == top.get("set")
+                         and p["side"] == top["side"] and p["slot"] != top["slot"]), None)
+            tail = f" — {mate['name']} mostly covers the rear" if mate else ""
+            note("info", f"{top['name']} hunts the net",
+                 f"At the front for {top['frontPct']:.0f}% of set-{top['set']} in-rally frames{tail}. "
+                 f"A defined front/back split is harder to break down than a 50/50 pair.")
+
+    # 4) rotation discipline — flips per minute
+    for team in ("A", "B"):
+        r = flow[team].get("rotPerMin")
+        if r is not None and r >= 22 and flow[team]["rallies"] >= 3:
+            note("watch", f"{teams[team]} rotate a lot",
+                 f"{r:.0f} formation flips per minute — frequent attack⇄defence churn can "
+                 f"mean they're being pulled around rather than dictating.")
+
+    return notes
 
 
 # ------------------------------------------------------------------ per-match
@@ -214,33 +416,51 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
         print(f"  !! {match_id}: no rallies (run doubles.track first) — skipping")
         return None
 
-    pairs = _pairs(match_id, m, set_no)
-    names = _slot_names(match_id, set_no)
-    rally_rows = _rally_table(match_id, windows, max_gap, min_len)
-    formation = _formation_summary(match_id, windows, rally_rows)
-    players = _player_table(match_id, set_no, max_gap, min_len)
+    pairs = _pairs(match_id, m, set_no)            # set-1 orientation (near=A, far=B)
+    teams = _teams(match_id, m)                     # fixed A/B labels for the whole match
+    rsides = _rally_sides(match_id, windows, fps)   # per-rally set + which team is near/far
+    rally_full = [{"start": int(a), "end": int(b),
+                   "near_pair": rs["nearPair"], "far_pair": rs["farPair"]}
+                  for (a, b), rs in zip(windows, rsides)]
+
+    rally_rows = _rally_table(match_id, windows, rsides, max_gap, min_len)
+    formation, formation_by_set = _formation_summary(match_id, windows, rally_rows, rsides)
+    players = _player_table(match_id, windows, rsides)
+    movements = _movement_table(match_id, fps, teams, rally_full)
+    flow = _flow_table(match_id, fps, rsides, max_gap, min_len)
+    showcase = validate.showcase(match_id, fps, max_gap, min_len, None)
+    notes = _coach_notes(teams, formation, flow, players)
     total_frames = sum(r["frames"] for r in rally_rows)
 
+    n_sets = max((r["set"] for r in rally_rows), default=1)
+    set_totals = [{"set": sn,
+                   "rallies": sum(1 for r in rally_rows if r["set"] == sn),
+                   "frames": sum(r["frames"] for r in rally_rows if r["set"] == sn)}
+                  for sn in range(1, n_sets + 1)]
+
     meta = dict(
-        id=match_id, discipline="doubles", pairs=pairs, names=names,
+        id=match_id, discipline="doubles", pairs=pairs, teams=teams,
         tournament=m.get("tournament"), round=m.get("round"),
         date=str(m.get("match_date", "")), youtubeId=_yt_id(m.get("video_url")),
-        result=m.get("result"), fps=fps,
+        result=m.get("result"), fps=fps, nSets=n_sets, sets=set_totals,
         totals=dict(rallies=len(windows), frames=total_frames,
                     rallySecs=round(total_frames / fps, 1)),
-        span=dict(f0=int(windows[0][0]), f1=int(windows[-1][1]), set=set_no),
+        span=dict(f0=int(windows[0][0]), f1=int(windows[-1][1])),
     )
     _write(out / match_id / "doubles.json",
-           dict(meta=meta, rallies=rally_rows, formation=formation, players=players))
+           dict(meta=meta, rallies=rally_rows, formation=formation,
+                formationBySet=formation_by_set, players=players,
+                movement=movements, flow=flow, showcase=showcase, notes=notes))
 
     rd = roles.roles_df(match_id)
     for i, (a, b) in enumerate(windows, 1):
-        _export_replay(match_id, i, a, b, fps, pairs, names, rd, out)
+        _export_replay(match_id, i, a, b, fps, teams, rsides[i - 1], rd, out)
 
-    return dict(id=match_id, discipline="doubles", pairs=pairs,
+    return dict(id=match_id, discipline="doubles",
+                pairs={"near": teams["A"], "far": teams["B"]},  # index keeps {near,far} shape
                 tournament=m.get("tournament"), round=m.get("round"),
                 date=str(m.get("match_date", "")), youtubeId=_yt_id(m.get("video_url")),
-                result=m.get("result"), rallies=len(windows))
+                result=m.get("result"), rallies=len(windows), nSets=n_sets)
 
 
 def _merge_index(out: Path, entry: dict) -> None:

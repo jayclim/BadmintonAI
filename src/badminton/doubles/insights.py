@@ -53,6 +53,63 @@ def rally_report(match_id: str, max_gap: int = 20, min_len: int = 45) -> pd.Data
     return pd.DataFrame(out)
 
 
+def _form_segments(s: pd.DataFrame) -> list[list]:
+    """Run-length [startFrame, endFrame, 'attack'|'defence'] of the DEBOUNCED formation
+    (Schmitt-triggered, matching roles/render) for one side over its sorted rows."""
+    s = s.sort_values("frame_num")
+    if s.empty:
+        return []
+    labels = roles.hysteresis_formation((s.depth_gap - s.lateral_gap).tolist())
+    frames = s.frame_num.tolist()
+    segs, start, cur, prev = [], frames[0], labels[0], frames[0]
+    for f, lab in zip(frames[1:], labels[1:]):
+        if lab != cur:
+            segs.append([int(start), int(prev), cur])
+            start, cur = f, lab
+        prev = f
+    segs.append([int(start), int(frames[-1]), cur])
+    return segs
+
+
+def formation_flow(match_id: str, max_gap: int = 20, min_len: int = 45) -> dict:
+    """How each side's formation *flows* through a rally — the doubles answer to the
+    singles shot-pattern view. Returns the per-rally attack/defence run-length segments
+    (for a flow strip) plus per-side aggregates: who seizes the attack first, how long
+    they hold it, rotation cadence, and the attack<->defence transition split.
+
+    All segments are in VIDEO frames; the exporter converts to seconds for the web."""
+    windows = segment.rally_windows(match_id, max_gap, min_len)
+    rd = roles.roles_df(match_id)
+    rallies: list[dict] = []
+    agg = {side: {"attack_first": 0, "defence_first": 0, "rallies": 0,
+                  "a2d": 0, "d2a": 0, "rotations": 0,
+                  "attack_frames": 0, "total_frames": 0, "holds": []}
+           for side in ("near", "far")}
+    for i, (a, b) in enumerate(windows, 1):
+        seg = rd[(rd.frame_num >= a) & (rd.frame_num <= b)]
+        row: dict = {"rally": i, "f0": int(a), "f1": int(b)}
+        for side in ("near", "far"):
+            segs = _form_segments(seg[seg.side == side])
+            row[side] = segs
+            if not segs:
+                continue
+            g = agg[side]
+            g["rallies"] += 1
+            g["attack_first" if segs[0][2] == "attack" else "defence_first"] += 1
+            for s0, s1, lab in segs:
+                dur = s1 - s0 + 1
+                g["total_frames"] += dur
+                if lab == "attack":
+                    g["attack_frames"] += dur
+                    g["holds"].append(dur)
+            for x, y in zip(segs, segs[1:]):
+                g["a2d"] += x[2] == "attack" and y[2] == "defence"
+                g["d2a"] += x[2] == "defence" and y[2] == "attack"
+            g["rotations"] += len(segs) - 1
+        rallies.append(row)
+    return {"windows": windows, "rallies": rallies, "agg": agg}
+
+
 def player_report(match_id: str, set_no: int = 1, max_gap: int = 20, min_len: int = 45):
     """Per named player: front share + mean court position over all rally frames.
     Returns None if no identity roster is set for the match/set."""

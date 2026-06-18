@@ -16,12 +16,12 @@ import {
   type DSlot,
   type Formation,
   SLOTS_OF,
+  TEAM_COLOR,
 } from "@/lib/doubles";
 
 const K = 30;
 const W = COURT.w, L = COURT.l, NET = COURT.net;
 const PAD = 1.0;
-const SIDE_COLOR: Record<DSide, string> = { near: "var(--pa)", far: "var(--pb)" };
 
 const svgProps = {
   viewBox: `${-PAD * K} ${-PAD * K} ${(W + 2 * PAD) * K} ${(L + 2 * PAD) * K}`,
@@ -97,12 +97,17 @@ export function DoublesReplay2D({ rep }: { rep: DoublesReplay }) {
     return Math.abs(p0[1] - NET) <= Math.abs(p1[1] - NET) ? s0 : s1;
   };
 
+  // colour each side by the TEAM occupying it this rally (so a team keeps its hue across
+  // set end-swaps); fall back to fixed near/far hues for older replays without pair tags
+  const sideColor = (side: DSide): string =>
+    TEAM_COLOR[(side === "near" ? rep.nearPair : rep.farPair) ?? (side === "near" ? "A" : "B")];
+
   return (
     <div>
       <svg {...svgProps} className="w-full">
         <CourtLines />
         {(["near", "far"] as DSide[]).map((side) => {
-          const color = SIDE_COLOR[side];
+          const color = sideColor(side);
           const front = frontOf(side);
           return SLOTS_OF[side].map((slot, i) => {
             const cur = pos(slot);
@@ -158,8 +163,10 @@ export function DoublesReplay2D({ rep }: { rep: DoublesReplay }) {
               className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-md border"
               style={{ borderColor: "var(--line)" }}
             >
-              <span className="mono text-[10px] tracking-[0.14em]" style={{ color: SIDE_COLOR[side] }}>
-                {side.toUpperCase()}
+              <span className="mono text-[10px] tracking-[0.14em] truncate max-w-[60%]"
+                style={{ color: sideColor(side) }}
+                title={rep.pairs?.[side]}>
+                {rep.pairs?.[side]?.split(" / ")[0]?.toUpperCase() ?? side.toUpperCase()}
               </span>
               <span
                 className="mono text-[11px] tracking-[0.1em] font-semibold"
@@ -241,32 +248,53 @@ function Controls({
   );
 }
 
-/** Horizontal attack/defence timeline for one side over a rally. */
+/** Horizontal attack/defence timeline for one side over a rally. With `marks`, each
+    internal segment boundary (a debounced ROTATION event — attack⇄defence flip) is drawn
+    as a tick over the bar, so the rotation count is legible as discrete events. */
 export function FormationTimeline({
   segs,
   f0,
   f1,
   color,
+  marks = false,
 }: {
   segs: [number, number, Formation][];
   f0: number;
   f1: number;
   color: string;
+  marks?: boolean;
 }) {
   const span = Math.max(1, f1 - f0);
+  // internal boundaries = rotation events (start frame of every segment after the first)
+  const boundaries = segs.slice(1).map(([a]) => a);
   return (
-    <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-[var(--line)]">
-      {segs.map(([a, b, f], i) => (
-        <div
-          key={i}
-          title={f}
-          style={{
-            width: `${(100 * (b - a + 1)) / span}%`,
-            background: f === "attack" ? color : "var(--line-soft)",
-            opacity: f === "attack" ? 0.9 : 1,
-          }}
-        />
-      ))}
+    <div className="relative">
+      <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-[var(--line)]">
+        {segs.map(([a, b, f], i) => (
+          <div
+            key={i}
+            title={f}
+            style={{
+              width: `${(100 * (b - a + 1)) / span}%`,
+              background: f === "attack" ? color : "var(--line-soft)",
+              opacity: f === "attack" ? 0.9 : 1,
+            }}
+          />
+        ))}
+      </div>
+      {marks &&
+        boundaries.map((bf, i) => (
+          <div
+            key={i}
+            title={`rotation @ ${(((bf - f0) / span) * 100).toFixed(0)}%`}
+            className="absolute -top-0.5 h-3.5 w-px"
+            style={{
+              left: `${(100 * (bf - f0)) / span}%`,
+              background: "var(--ink)",
+              opacity: 0.55,
+            }}
+          />
+        ))}
     </div>
   );
 }

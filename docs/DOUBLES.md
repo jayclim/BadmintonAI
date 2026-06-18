@@ -68,6 +68,46 @@ py -m badminton.calibrate_court wtf_2024_md_sf     # click the 4 OUTER corners
 Until that writes a homography, `doubles.track` will exit with "no homography". After
 it's calibrated, run the track → roles steps above.
 
+## Full-match tracking + multi-set structure (`doubles/sets.py`)
+
+The whole broadcast can be tracked end to end and the dashboard then covers the full match,
+not a single span:
+
+```bash
+scripts/run_doubles_track.sh wtf_2024_md_sf 0 166650 20000   # ~4.5h MPS, chunked + resumable
+py -m badminton.doubles.export_web wtf_2024_md_sf            # set-aware export (OCRs each rally)
+```
+
+`run_doubles_track.sh` runs `doubles.track` in 20k-frame chunks; each chunk writes at its end
+(`process_video` DELETEs then INSERTs its range), so progress persists and a crash only loses
+the in-flight chunk — resume by re-running with the last chunk's start. On `wtf_2024_md_sf` the
+full 166,650 frames produced ~405k track rows at ~10.5 fps.
+
+A real match is several games, and **two things change across games that would otherwise
+mis-attribute every stat**: the score resets, and the pairs **swap ends** between games (and
+once more, mid-game, when a side first reaches 11 in the decider). `doubles/sets.py` handles
+both, purely:
+
+- **Set boundaries** come from the scoreboard OCR — the per-rally score TOTAL (top+bot) climbs
+  within a game and collapses at the next game's first rally. The total is order-invariant, so
+  it survives the end-swap and the OCR's only systematic confusion (8↔0). `assign_sets`.
+- **Side↔pair** is then pure bookkeeping off the set-1 anchor: pair **A** := whoever started on
+  the near end in set 1, **B** := the far pair; each game transition swaps ends, the deciding
+  game adds one swap at 11 (`side_pair_map`, `deciding_swap_frame`). No per-set roster needed.
+- `rally_sides` / `analyze` tie it together → each rally tagged `{set, near_pair, far_pair}`.
+
+The exporter (`export_web.py`) aggregates **per TEAM (A/B)** across all sets by translating each
+rally's geometric near/far through that map, and emits per-set breakdowns (`formationBySet`,
+`meta.sets`). Per-pair movement combines each pair's two players onto one near half so it stays
+correct through the swaps (`movement.team_movement`). Verified on `wtf_2024_md_sf`: 3 sets
+detected (47 / 47 / 69 rallies), the decider's 11-point swap located at the right rally, and the
+set-1 attack split (B 72% vs A 39%) matches who won that game. The web is fully team-keyed
+(`Team = "A"|"B"`, `TEAM_COLOR`); dot/timeline colours follow the team through end-swaps.
+
+Caveats: rally segmentation is tracks-only (no shuttle yet), so the count slightly over-segments
+(163 windows vs ~127 actual points); set detection needs readable scoreboard OCR; the per-player
+net-hunter is computed only for sets with a `doubles_identity` roster (set 1 here).
+
 ## Persistent identity (optional layer — `doubles/identity.py`)
 
 Roles above are identity-free and robust. When you also want **named** players (per-athlete
@@ -123,23 +163,46 @@ dashboard is untouched and the whole doubles web layer is deletable. (The single
 table, which doubles has no rows in.)
 
 - **Exporter:** `py -m badminton.doubles.export_web <match_id>` writes
-  `web/public/data/<id>/doubles.json` (meta + per-rally formation report + per-side
-  match summary + per-player front-court share), per-rally 4-player replay tracks under
+  `web/public/data/<id>/doubles.json` (meta + per-rally formation report + per-side match
+  summary + per-player front-court share + per-slot movement + formation `flow` + label-free
+  `showcase` + rule-based coach `notes`), per-rally 4-player replay tracks under
   `.../dreplay/r<n>.json` (near/near2/far/far2 court-metre paths + debounced formation
   run-length segments), and upserts `doubles_index.json`. Re-implements export_web's tiny
   `_js`/`_write`/`_yt_id` helpers locally to keep the isolation rule (no import of the
   high-level singles `export_web`).
+- **Movement (`doubles/movement.py`):** per-slot distance / speed / coverage / front-mid-
+  back occupancy + a positional heatmap, rally-scoped and median-smoothed, with far-side
+  positions mirrored (x→W-x, y→L-y) onto a single near half so all four players are
+  directly comparable. The heat dict matches the singles `_heat` contract exactly, so the
+  web `court.tsx::HeatMap` renders it unchanged. Also `court_control()` — a per-frame
+  2-player Voronoi over each team's own half giving each player's nearest-partner
+  **territory** share (whole-court Voronoi is the wrong tool: the net splits the court and
+  reach-coverage% is identical for both pairs, so only the intra-pair split is informative).
+  Self-contained (re-implements `_smooth`, the speed cap, the bins — imports only
+  `court`/`db` + sibling `segment`).
+- **Validation (`doubles/validate.py`):** label-free tracking-quality metrics for the AI
+  Lab — all-4 in-rally coverage, per-slot recall, identity stability (median court step +
+  count of non-physical >1.5 m ID jumps), and segmentation — from tracks alone.
+- **Insights (`doubles/insights.py`):** added `formation_flow()` (per-rally attack/defence
+  run-length segments + per-side aggregates: attack-first share, median attack hold,
+  rotation cadence, a2d/d2a transitions) and the shared `_form_segments()` (the exporter and
+  replay both call it now, no duplication).
 - **Web (Next.js):** `web/lib/doubles.ts` (types + client loaders), route
   `web/app/d/[id]/[view]/page.tsx` (`generateStaticParams` from the doubles manifest),
-  `web/components/DoublesDashboard.tsx`, and views in `web/components/doubles/`:
-  **Overview** (attack/defence split, rotations, front-swaps, median gaps, "who hunts the
-  net" per-player front share, rally log) and **Film** (4-player animated 2D replay in
-  `court4.tsx` reusing `court.tsx::CourtLines`; formation timeline; YouTube rally clip).
-  Front/back is recomputed every frame from geometry, so it survives slot swaps. The home
-  page (`web/app/page.tsx`) gained an additive "Doubles" section linking to `/d/<id>/`.
-- Verified on `wtf_2024_md_sf`: `next build` (static export) emits `/d/.../overview` and
-  `/d/.../film`; both render the real data (formation cards, 4-player court). The official
-  scoreline lives in `matches.yaml` as `result:` (display-only context).
+  `web/components/DoublesDashboard.tsx`, and **five** views in `web/components/doubles/`:
+  **Overview** (AI scouting-notes strip + attack/defence split, rotations, front-swaps,
+  median gaps, "who hunts the net", rally log), **Court** (`Movement.tsx`: per-player
+  heatmaps + distance/speed/coverage + NET/MID/REAR occupancy + territory, reusing
+  `court.tsx::HeatMap`), **Patterns** (`Patterns.tsx`: formation-flow — who seizes/holds the
+  attack, rotation rate, transitions, per-rally attack⇄defence dual trace), **Film**
+  (4-player animated 2D replay in `court4.tsx`; formation timeline with rotation tick
+  markers; YouTube rally clip), and **AI Lab** (`Lab.tsx`: label-free validation showcase +
+  per-player tracking-quality table + rally x-ray reusing the 4-player replay). Front/back is
+  recomputed every frame from geometry, so it survives slot swaps. The home page gained an
+  additive "Doubles" section linking to `/d/<id>/`.
+- Verified on `wtf_2024_md_sf`: `next build` (static export) emits all five routes
+  (`overview`/`court`/`patterns`/`film`/`lab`); all render the real data. `tests/test_doubles.py`
+  = 28/28. The official scoreline lives in `matches.yaml` as `result:` (display-only context).
 
 To refresh after re-tracking: `py -m badminton.doubles.export_web <id>` then `cd web && npm run build`.
 
@@ -158,9 +221,13 @@ tracking proves out on real footage:
 - **Serve-seeded persistent identity.** Anchor `near` to a specific athlete using the
   service court (fixed by score parity, which we already OCR). Only needed for
   per-athlete career stats; roles don't depend on it.
-- **Richer doubles tactics + web.** The dashboard (formation timeline, rotations,
-  per-player front-court share, 4-player replay) is built — see "Web dashboard" above.
-  Still open: Voronoi / court-control area, per-player movement heatmaps, and rotation
-  *event* markers on the replay.
+- **Richer doubles tactics + web.** Five views are built (Overview + scouting notes, Court
+  movement heatmaps + territory, Patterns formation-flow, Film replay + rotation markers, AI
+  Lab validation showcase) — see "Web dashboard" above. Still open: a **Points/momentum
+  view** from the OCR scores (scores computed on demand via `identity.rally_scores_ocr` but
+  not yet persisted into the export; only ~4 distinct score points across the 5 tracked
+  rallies, so low value until more is tracked), and **LLM coach notes** (the current notes
+  are rule-based; an `anthropic` generation step would add prose). A full per-pixel Voronoi
+  map was deliberately skipped — see Movement note above.
 - **Validation set.** Hand-annotate ~1–2 doubles matches to measure accuracy (mirrors
   the SOTA paper, which labeled exactly two).

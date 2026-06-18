@@ -7,10 +7,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Heat } from "@/lib/types";
 
 export type DSide = "near" | "far";
 export type DSlot = "near" | "near2" | "far" | "far2";
 export type Formation = "attack" | "defence";
+/** the two fixed teams: A = whoever started on the near end in set 1, B = the far pair.
+    Stats aggregate per team across all sets (the pairs swap ends between games). */
+export type Team = "A" | "B";
 
 export interface DoublesIndexMatch {
   id: string;
@@ -28,7 +32,7 @@ export interface DoublesIndex {
   matches: DoublesIndexMatch[];
 }
 
-/** one side's tactics within a rally (null when that side wasn't 2-tracked) */
+/** one team's tactics within a rally (null when that team wasn't 2-tracked that rally) */
 export interface SideTactics {
   attackPct: number;
   rotations: number;
@@ -45,8 +49,10 @@ export interface DoublesRally {
   t1: number;
   durS: number;
   frames: number;
-  near: SideTactics | null;
-  far: SideTactics | null;
+  nearPair: Team;
+  farPair: Team;
+  A: SideTactics | null;
+  B: SideTactics | null;
 }
 
 export interface FormationSide {
@@ -59,10 +65,15 @@ export interface FormationSide {
   medianLateralGapM: number | null;
 }
 
+/** per-set formation: a {set} tag plus a FormationSide per team */
+export type FormationBySet = { set: number } & Record<Team, FormationSide>;
+
 export interface PlayerShare {
   name: string;
   slot: DSlot;
   side: DSide;
+  set: number;
+  team: Team;
   frontPct: number;
   frames: number;
 }
@@ -71,22 +82,97 @@ export interface DoublesMeta {
   id: string;
   discipline: "doubles";
   pairs: Record<DSide, string>;
-  names: Record<DSlot, string> | null;
+  teams: Record<Team, string>;
   tournament: string;
   round: string;
   date: string;
   youtubeId: string | null;
   result: string | null;
   fps: number;
+  nSets: number;
+  sets: { set: number; rallies: number; frames: number }[];
   totals: { rallies: number; frames: number; rallySecs: number };
-  span: { f0: number; f1: number; set: number };
+  span: { f0: number; f1: number };
+}
+
+/** per-TEAM movement over the match (both the pair's players combined, heat on one half) */
+export interface TeamMovement {
+  pair: Team;
+  name: string;
+  distM: number;
+  secs: number;
+  speed: number;
+  cov: number;
+  front: number;
+  mid: number;
+  back: number;
+  heat: Heat;
+}
+
+/** per-team formation-flow aggregates over the tracked rallies */
+export interface FlowSide {
+  rallies: number;
+  attackFirst: number;
+  defenceFirst: number;
+  attackFirstPct: number | null;
+  attackPct: number | null;
+  attackHoldMedS: number | null;
+  rotPerRally: number | null;
+  rotPerMin: number | null;
+  a2d: number;
+  d2a: number;
+}
+
+export interface FlowRally {
+  rally: number;
+  set: number;
+  f0: number;
+  f1: number;
+  durS: number;
+  nearPair: Team;
+  farPair: Team;
+  near: FormSeg[];
+  far: FormSeg[];
+}
+
+export interface DoublesFlow {
+  A: FlowSide;
+  B: FlowSide;
+  rallies: FlowRally[];
+}
+
+/** label-free tracking-quality metrics for the AI-Lab showcase */
+export interface ShowcaseSlot {
+  slot: DSlot;
+  name: string;
+  recallPct: number;
+  medStepCm: number | null;
+  teleports: number;
+}
+
+export interface DoublesShowcase {
+  coverage: { inRallyPct: number; frames: number; all4: number };
+  slots: ShowcaseSlot[];
+  segmentation: { rallies: number; spanS: number; minLen: number; maxGap: number };
+}
+
+/** one rule-based, doubles-tailored scouting note */
+export interface CoachNote {
+  kind: "good" | "watch" | "info";
+  head: string;
+  body: string;
 }
 
 export interface DoublesMatch {
   meta: DoublesMeta;
   rallies: DoublesRally[];
-  formation: Record<DSide, FormationSide>;
+  formation: Record<Team, FormationSide>;
+  formationBySet: FormationBySet[];
   players: PlayerShare[];
+  movement: TeamMovement[];
+  flow: DoublesFlow;
+  showcase: DoublesShowcase | null;
+  notes: CoachNote[];
 }
 
 /** run-length [startFrame, endFrame, formation] of the debounced (hysteresis) formation */
@@ -98,11 +184,17 @@ export interface DoublesReplay {
   f1: number;
   rally: number;
   set: number;
-  pairs: Record<DSide, string>;
+  nearPair: Team;
+  farPair: Team;
+  pairs: Record<DSide, string>; // near/far -> the team display name occupying that side
   names: Record<DSlot, string> | null;
   tracks: Record<DSlot, [number, number, number][]>; // [frame, court x, court y]
   form: Record<DSide, FormSeg[]>;
 }
+
+export const TEAMS: Team[] = ["A", "B"];
+/** team colours — reuse the singles player palette (pa/pb) */
+export const TEAM_COLOR: Record<Team, string> = { A: "var(--pa)", B: "var(--pb)" };
 
 export const DSLOTS: DSlot[] = ["near", "near2", "far", "far2"];
 export const SIDE_OF: Record<DSlot, DSide> = {
