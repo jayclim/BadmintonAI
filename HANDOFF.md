@@ -16,6 +16,17 @@ dashboard first → tactical commentary later · singles first → doubles later
 
 ## 2. Current status (as of 2026-06-18)
 
+- **DOUBLES — SCOREBOARD-GATED RALLY SEGMENTATION (2026-06-18).** Fixed false rallies: the
+  tracks-only `doubles/segment.py` was tagging intro/crowd/warm-up footage AND mid-match
+  replays/celebrations as rallies (no court-line detector exists — every detection is projected
+  through one hand-calibrated homography regardless of camera), inflating to 163 windows incl.
+  pre-match B-roll. `rally_windows` now GATES on scoreboard presence (keep a window only if the
+  live BWF score overlay reads in ≥1 of 6 sampled frames; measured cleanly bimodal — 43 B-roll
+  windows read 0, every real rally reads a plausible live score) → **120 live rallies**. Kept
+  windows keep identical frame bounds, so the 120 surviving clips were reused as-is (43 orphan
+  B-roll clips deleted, dreplay regenerated, doubles.json re-exported). OCR cached per
+  (match,params); degrades to ungated if the score box can't be calibrated. Tests 35/35.
+
 - **DOUBLES — ANNOTATED VIDEO + POINTS TAB + PER-PLAYER COURT (2026-06-18).** The doubles
   surface now matches the singles dashboard's shape and has AI-annotated footage.
   - **Annotated clips (NEW):** `doubles/render.py` bakes the reprojected court + 4 pose
@@ -64,11 +75,12 @@ dashboard first → tactical commentary later · singles first → doubles later
     (`lib/doubles.ts` `Team="A"|"B"`, `TEAM_COLOR`); dot/timeline colours follow each team
     through end-swaps. New backend: `doubles/{sets,movement,validate}.py`; `doubles/insights.py`
     gained `formation_flow`.
-  - **Open / caveats:** rally segmentation is tracks-only → slightly over-segments (163 windows
-    vs ~127 actual points); per-player net-hunter only for roster-named sets (set 1 — add set
-    2/3 rosters to `matches.yaml` to extend); LLM coach notes deferred (Points/momentum view
-    now SHIPPED — see the newer bullet); shot-level features still blocked on 4-slot hit
-    attribution. Full detail: `docs/DOUBLES.md`.
+  - **Open / caveats:** rally segmentation is now **scoreboard-gated** (drops intro/crowd/replay
+    B-roll — see the newest bullet) → 120 live rallies, not the old 163; a few real rallies are
+    still missed where tracking loses all 4 players (120 vs ~127); per-player net-hunter only for
+    roster-named sets (set 1 — add set 2/3 rosters to `matches.yaml` to extend); LLM coach notes
+    deferred (Points/momentum view now SHIPPED — see the newer bullet); shot-level features still
+    blocked on 4-slot hit attribution. Full detail: `docs/DOUBLES.md`.
   - **Isolation held:** all changes under `doubles/` + tests/docs; singles dashboard untouched.
     The working tree still carries pre-existing **unstaged singles edits that are not part of
     this work** (`web/components/views/*`, `court.tsx`, `ui.tsx`, `fmt.ts`, `globals.css`,

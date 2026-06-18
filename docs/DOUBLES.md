@@ -109,9 +109,18 @@ detected (47 / 47 / 69 rallies), the decider's 11-point swap located at the righ
 set-1 attack split (B 72% vs A 39%) matches who won that game. The web is fully team-keyed
 (`Team = "A"|"B"`, `TEAM_COLOR`); dot/timeline colours follow the team through end-swaps.
 
-Caveats: rally segmentation is tracks-only (no shuttle yet), so the count slightly over-segments
-(163 windows vs ~127 actual points); set detection needs readable scoreboard OCR; the per-player
-net-hunter is computed only for sets with a `doubles_identity` roster (set 1 here).
+Rally segmentation is **scoreboard-gated** (`segment.rally_windows`, on by default): the raw
+tracks-only pass over-segments badly because there is no court-line detector — every detection is
+projected through one hand-calibrated homography regardless of where the camera points, so intro /
+crowd / warm-up footage AND mid-match replays + celebrations all show "4 players in court" and leak
+in as fake rallies. The gate keeps a window only if the live BWF score overlay reads in it (live
+play always carries the graphic; B-roll reads zero). On `wtf_2024_md_sf` this drops 43 of 163
+candidates → **120 live rallies** (close to the ~127 true points), removing the intro footage and
+replays the raw pass invented. It degrades to ungated if the score box can't be calibrated.
+
+Caveats: the gate needs readable scoreboard OCR; a few real rallies are still missed where tracking
+drops all four players (120 vs ~127); the per-player net-hunter is computed only for sets with a
+`doubles_identity` roster (set 1 here).
 
 ## Persistent identity (optional layer — `doubles/identity.py`)
 
