@@ -36,10 +36,11 @@ import pandas as pd
 
 from .. import config, court, db
 from . import identity as _identity
-from . import insights, movement, roles, segment, sets, validate
+from . import insights, movement, points, roles, segment, sets, validate
 
 OUT_DEFAULT = config.REPO_ROOT / "web" / "public" / "data"
 DOUBLES_INDEX = "doubles_index.json"
+CLIPS_DIR = config.REPO_ROOT / "web" / "public" / "clips"
 SLOTS = ("near", "near2", "far", "far2")
 
 
@@ -68,6 +69,30 @@ def _write(path: Path, obj) -> None:
 def _yt_id(url: str) -> str | None:
     m = re.search(r"(?:youtu\.be/|v=)([\w-]{6,})", url or "")
     return m.group(1) if m else None
+
+
+# ------------------------------------------------------------------ annotated clips
+
+def _clip_windows(match_id: str) -> list[tuple[int, int, str]]:
+    """AI-annotated rally clips on disk: (start, end, relative url). Clip names carry
+    their video-frame window so each rally maps on by overlap. Mirrors the singles
+    export_web._clip_windows (re-implemented here to keep the isolation rule)."""
+    out: list[tuple[int, int, str]] = []
+    for p in sorted((CLIPS_DIR / match_id).glob("f*-*.mp4")):
+        m = re.match(r"f(\d+)-(\d+)\.mp4$", p.name)
+        if m:
+            out.append((int(m.group(1)), int(m.group(2)), f"/clips/{match_id}/{p.name}"))
+    return out
+
+
+def _clip_for(clips: list[tuple[int, int, str]], f0: int, f1: int) -> str | None:
+    """The clip whose frame window best overlaps [f0, f1] (>= 60% of the rally), else None."""
+    best, best_ov = None, 0
+    for a, b, url in clips:
+        ov = min(f1, b) - max(f0, a)
+        if ov > best_ov:
+            best, best_ov = url, ov
+    return best if best_ov >= 0.6 * (f1 - f0) else None
 
 
 # ------------------------------------------------------------------ identity / names
@@ -104,17 +129,21 @@ def _teams(match_id: str, m: dict) -> dict[str, str]:
     return {"A": p["near"], "B": p["far"]}
 
 
-def _rally_sides(match_id: str, windows, fps: float) -> list[dict]:
-    """Per-rally set + which team (A/B) is on near/far, aligned 1:1 to `windows`.
-
-    Uses sets.analyze (scoreboard OCR). If OCR/sets can't be resolved, falls back to a
-    single set with the set-1 orientation (near=A, far=B) so a tracked-but-unread match
-    still exports sensibly."""
+def _ocr_scores(match_id: str, windows):
+    """Per-rally (start, end, top, bot) scoreboard reads — computed ONCE per export and
+    shared by both set detection and the Points view (the cv2 seeks are the slow part)."""
     try:
-        rs = sets.analyze(match_id, windows=windows)
+        return _identity.rally_scores_ocr(match_id, windows)
     except Exception as e:  # OCR/scoreboard failure must not break the whole export
-        print(f"  note: set detection failed ({e}); treating as a single set")
-        rs = None
+        print(f"  note: scoreboard OCR failed ({e}); treating as a single set, no scores")
+        return None
+
+
+def _rally_sides(windows, scores) -> list[dict]:
+    """Per-rally set + which team (A/B) is on near/far, aligned 1:1 to `windows`, from the
+    precomputed OCR scores. Falls back to a single set with the set-1 orientation
+    (near=A, far=B) so a tracked-but-unread match still exports sensibly."""
+    rs = sets.rally_sides(scores) if scores else None
     if rs and len(rs) == len(windows):
         return [{"set": r["set"], "nearPair": r["near_pair"], "farPair": r["far_pair"],
                  "total": r["total"]} for r in rs]
@@ -124,11 +153,12 @@ def _rally_sides(match_id: str, windows, fps: float) -> list[dict]:
 # ------------------------------------------------------------------ tactics tables
 
 def _rally_table(match_id: str, windows, rsides: list[dict],
-                 max_gap: int, min_len: int) -> list[dict]:
-    """Per rally: frames/time, its real SET, which team is near/far, and each TEAM's attack
-    share / rotations / front-swaps. The geometric near/far stats are mapped to teams A/B
-    via the per-rally side→pair map, so a rally in set 2 (ends swapped) credits the right
-    team. `insights.rally_report` shares the windows, so its 1-based rally index aligns."""
+                 clips: list, max_gap: int, min_len: int) -> list[dict]:
+    """Per rally: frames/time, its real SET, which team is near/far, the annotated-clip url
+    (if rendered), and each TEAM's attack share / rotations / front-swaps. The geometric
+    near/far stats are mapped to teams A/B via the per-rally side→pair map, so a rally in
+    set 2 (ends swapped) credits the right team. `insights.rally_report` shares the windows,
+    so its 1-based rally index aligns."""
     rr = insights.rally_report(match_id, max_gap, min_len)
     fps = float(config.get_match(match_id)["fps"])
     out = []
@@ -138,6 +168,7 @@ def _rally_table(match_id: str, windows, rsides: list[dict],
                      "t0": round(a / fps, 2), "t1": round(b / fps, 2),
                      "durS": round((b - a + 1) / fps, 2), "frames": int(b - a + 1),
                      "nearPair": rsi["nearPair"], "farPair": rsi["farPair"],
+                     "clip": _clip_for(clips, int(a), int(b)),
                      "A": None, "B": None}
         for side, team in (("near", rsi["nearPair"]), ("far", rsi["farPair"])):
             sr = rr[(rr.rally == i) & (rr.side == side)]
@@ -244,17 +275,16 @@ def _player_table(match_id: str, windows, rsides: list[dict]) -> list[dict]:
 
 def _movement_table(match_id: str, fps: float, teams: dict,
                     rally_full: list[dict]) -> list[dict]:
-    """Per-TEAM movement across the whole match (distance/speed/coverage, front/mid/back,
-    positional heat), each pair's two players combined onto one near half so it's swap-safe
-    across sets. One entry per team, named from the fixed team labels."""
-    mv = movement.team_movement(match_id, fps, rally_full)
-    out = []
-    for team in ("A", "B"):
-        m = mv.get(team)
-        if not m:
-            continue
-        out.append({"name": teams[team], **m})
-    return out
+    """Per-PLAYER movement (FOUR per set): distance/speed/coverage, front/mid/back, and a
+    positional heatmap, each far-side player mirrored onto one near half so all four are
+    comparable. Keyed by (set, team, within-pair index) so it's correct through the
+    end-swaps; set-1 entries carry the real athlete name (roster-anchored), other sets
+    carry name=None (the web shows the pair name + P1/P2 — the team is always known, only
+    the within-pair identity isn't)."""
+    team_names = _identity.team_slot_names(match_id)   # (team, idx) -> name, or None
+    # name is the exact roster athlete for set 1, None otherwise — the web renders the
+    # honest fallback (pair name + P1/P2) rather than guessing which member is which.
+    return movement.player_movement(match_id, fps, rally_full, team_names)
 
 
 # ------------------------------------------------------------------ formation flow
@@ -418,18 +448,23 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
 
     pairs = _pairs(match_id, m, set_no)            # set-1 orientation (near=A, far=B)
     teams = _teams(match_id, m)                     # fixed A/B labels for the whole match
-    rsides = _rally_sides(match_id, windows, fps)   # per-rally set + which team is near/far
-    rally_full = [{"start": int(a), "end": int(b),
+    scores = _ocr_scores(match_id, windows)         # (start,end,top,bot) per rally — OCR ONCE
+    rsides = _rally_sides(windows, scores)          # per-rally set + which team is near/far
+    clips = _clip_windows(match_id)                 # annotated rally clips on disk (if rendered)
+    rally_full = [{"start": int(a), "end": int(b), "set": rs["set"],
                    "near_pair": rs["nearPair"], "far_pair": rs["farPair"]}
                   for (a, b), rs in zip(windows, rsides)]
 
-    rally_rows = _rally_table(match_id, windows, rsides, max_gap, min_len)
+    rally_rows = _rally_table(match_id, windows, rsides, clips, max_gap, min_len)
     formation, formation_by_set = _formation_summary(match_id, windows, rally_rows, rsides)
     players = _player_table(match_id, windows, rsides)
     movements = _movement_table(match_id, fps, teams, rally_full)
     flow = _flow_table(match_id, fps, rsides, max_gap, min_len)
     showcase = validate.showcase(match_id, fps, max_gap, min_len, None)
     notes = _coach_notes(teams, formation, flow, players)
+    # Points / momentum from the scoreboard scores (rows are fixed by team; top_team anchors it)
+    pts = points.build(scores, sets.rally_sides(scores), fps,
+                       m.get("scoreboard_top_team", "A")) if scores else None
     total_frames = sum(r["frames"] for r in rally_rows)
 
     n_sets = max((r["set"] for r in rally_rows), default=1)
@@ -450,7 +485,7 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
     _write(out / match_id / "doubles.json",
            dict(meta=meta, rallies=rally_rows, formation=formation,
                 formationBySet=formation_by_set, players=players,
-                movement=movements, flow=flow, showcase=showcase, notes=notes))
+                movement=movements, flow=flow, points=pts, showcase=showcase, notes=notes))
 
     rd = roles.roles_df(match_id)
     for i, (a, b) in enumerate(windows, 1):

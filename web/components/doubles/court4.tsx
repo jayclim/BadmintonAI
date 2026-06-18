@@ -10,7 +10,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CourtLines } from "@/components/court";
 import { COURT } from "@/lib/types";
+import { ytEmbed } from "@/lib/fmt";
+import { useOverlayPref } from "@/lib/overlay";
 import {
+  type DoublesRally,
   type DoublesReplay,
   type DSide,
   type DSlot,
@@ -18,6 +21,47 @@ import {
   SLOTS_OF,
   TEAM_COLOR,
 } from "@/lib/doubles";
+
+/** Rally footage honouring the global AI-overlay preference: the pre-rendered annotated
+    clip (4-player pose + names/roles + formation + score OCR baked in) when ON and
+    rendered, else the raw YouTube broadcast. The doubles analogue of components/RallyVideo. */
+export function DoublesVideo({ row, youtubeId }: { row: DoublesRally; youtubeId: string | null }) {
+  const [overlayOn] = useOverlayPref();
+  const useClip = overlayOn && !!row.clip;
+  return (
+    <div>
+      <div className="aspect-video rounded-md overflow-hidden border border-[var(--line)] bg-black">
+        {useClip ? (
+          <video key={row.clip!} src={row.clip!} className="w-full h-full" controls autoPlay muted playsInline />
+        ) : youtubeId ? (
+          <iframe
+            key={`${row.rally}-yt`}
+            src={ytEmbed(youtubeId, row.t0, row.t1)}
+            className="w-full h-full"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            title="rally clip"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-dim mono text-[12px]">
+            NO FOOTAGE
+          </div>
+        )}
+      </div>
+      <div className="mt-1.5">
+        {useClip ? (
+          <span className="mono text-[10px] tracking-[0.14em]" style={{ color: "var(--ai)" }}>
+            ● AI-ANNOTATED — 4-player pose · names · roles · formation · machine-read score
+          </span>
+        ) : (
+          <span className="mono text-[10px] tracking-[0.14em] text-dim">
+            RAW BROADCAST{overlayOn && !row.clip ? " — no annotated clip for this rally" : ""}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const K = 30;
 const W = COURT.w, L = COURT.l, NET = COURT.net;

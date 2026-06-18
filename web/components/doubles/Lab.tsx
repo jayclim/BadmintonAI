@@ -11,7 +11,7 @@ import type { DoublesViewProps } from "@/components/DoublesDashboard";
 import type { DSide, DSlot } from "@/lib/doubles";
 import { SIDE_OF, useDoublesReplay } from "@/lib/doubles";
 import { AiTag, Card, Metric, Section, Select } from "@/components/ui";
-import { DoublesReplay2D } from "@/components/doubles/court4";
+import { DoublesReplay2D, DoublesVideo } from "@/components/doubles/court4";
 
 const SIDE_COLOR: Record<DSide, string> = { near: "var(--pa)", far: "var(--pb)" };
 
@@ -19,6 +19,7 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
   const { showcase: sc, meta, rallies } = d;
   const [rally, setRally] = useState<number>(rallies[0]?.rally ?? 1);
   const { data: rep } = useDoublesReplay(id, rally);
+  const row = rallies.find((r) => r.rally === rally);
 
   if (!sc) {
     return (
@@ -150,7 +151,7 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
         <Section
           kicker="ONE RALLY, WHAT THE MACHINE SEES"
           title="Rally x-ray"
-          hint="The raw 4-player tracking for any rally, rendered in true court metres. Front player solid, rear ringed; the formation banner is the debounced attack/defence call. No labels were used to produce any of it."
+          hint="The same rally two ways: the AI-annotated broadcast (4-player pose, names, roles, formation and the machine-read score baked in) beside the 2D reconstruction in true court metres. Front player solid, rear ringed. No labels were used to produce any of it."
         />
         <div className="max-w-xs mb-3">
           <Select
@@ -160,18 +161,27 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
             options={rallies.map((r) => String(r.rally))}
           />
         </div>
-        <Card className="max-w-3xl">
-          {rep ? (
-            <DoublesReplay2D rep={rep} />
-          ) : (
-            <div className="text-dim mono text-[12px] py-16 text-center animate-pulse">LOADING RALLY…</div>
+        <div className="grid lg:grid-cols-2 gap-5 items-start">
+          {row && (
+            <Card>
+              <div className="kicker mb-2">AI-ANNOTATED BROADCAST</div>
+              <DoublesVideo row={row} youtubeId={meta.youtubeId} />
+            </Card>
           )}
-          <div className="mt-3 text-[11.5px] text-dim flex flex-wrap gap-x-5 gap-y-1">
-            <span style={{ color: "var(--pa)" }}>● {meta.teams.A}</span>
-            <span style={{ color: "var(--pb)" }}>● {meta.teams.B}</span>
-            <span>solid = net (front) player · ring = rear cover</span>
-          </div>
-        </Card>
+          <Card>
+            <div className="kicker mb-2">2D RECONSTRUCTION — CV TRACKS</div>
+            {rep ? (
+              <DoublesReplay2D rep={rep} />
+            ) : (
+              <div className="text-dim mono text-[12px] py-16 text-center animate-pulse">LOADING RALLY…</div>
+            )}
+            <div className="mt-3 text-[11.5px] text-dim flex flex-wrap gap-x-5 gap-y-1">
+              <span style={{ color: "var(--pa)" }}>● {meta.teams.A}</span>
+              <span style={{ color: "var(--pb)" }}>● {meta.teams.B}</span>
+              <span>solid = net (front) player · ring = rear cover</span>
+            </div>
+          </Card>
+        </div>
       </section>
     </div>
   );

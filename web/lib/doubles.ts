@@ -51,6 +51,8 @@ export interface DoublesRally {
   frames: number;
   nearPair: Team;
   farPair: Team;
+  /** pre-rendered AI-annotated clip url, or null if none was rendered for this rally */
+  clip: string | null;
   A: SideTactics | null;
   B: SideTactics | null;
 }
@@ -107,6 +109,48 @@ export interface TeamMovement {
   mid: number;
   back: number;
   heat: Heat;
+}
+
+/** per-PLAYER movement for ONE set (four entries per set). `name` is the roster athlete
+    for set 1, null otherwise (the pairs swap ends and only set 1 is identity-anchored —
+    so later sets show the pair label + a P1/P2 index instead of a guessed name). */
+export interface PlayerMovement {
+  set: number;
+  team: Team;
+  idx: number; // within-pair index 0/1
+  name: string | null;
+  distM: number;
+  secs: number;
+  speed: number;
+  cov: number;
+  front: number;
+  mid: number;
+  back: number;
+  heat: Heat;
+}
+
+/** one accepted point in the OCR score trajectory */
+export interface ScorePoint {
+  rally: number;
+  a: number;
+  b: number;
+  winner: Team;
+}
+
+export interface PointsSet {
+  set: number;
+  points: ScorePoint[];
+  final: { a: number; b: number };
+  winner: Team | null;
+}
+
+/** Points / momentum, derived from the per-rally scoreboard OCR */
+export interface DoublesPoints {
+  topTeam: Team;
+  sets: PointsSet[];
+  lengthWins: Record<Team, { short: number; mid: number; long: number }>;
+  runs: Record<Team, number>;
+  rallyWinner: Record<string, Team>;
 }
 
 /** per-team formation-flow aggregates over the tracked rallies */
@@ -169,10 +213,18 @@ export interface DoublesMatch {
   formation: Record<Team, FormationSide>;
   formationBySet: FormationBySet[];
   players: PlayerShare[];
-  movement: TeamMovement[];
+  movement: PlayerMovement[];
   flow: DoublesFlow;
+  points: DoublesPoints | null;
   showcase: DoublesShowcase | null;
   notes: CoachNote[];
+}
+
+/** Display label for a per-player movement entry: the roster athlete name where known
+    (set 1), else the pair's display name + P1/P2 (the team is always known; only the
+    within-pair identity isn't anchored in later sets — so we don't fake a specific name). */
+export function playerLabel(m: PlayerMovement, teams: Record<Team, string>): string {
+  return m.name ?? `${teams[m.team]} · P${m.idx + 1}`;
 }
 
 /** run-length [startFrame, endFrame, formation] of the debounced (hysteresis) formation */

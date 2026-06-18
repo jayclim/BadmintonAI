@@ -354,6 +354,40 @@ def test_movement_heat_shape_and_binning():
     assert all(0 <= i < h["nx"] and 0 <= j < h["ny"] for i, j, _ in h["cells"])
 
 
+def test_points_clean_drops_dupes_and_regressions():
+    """Score cleaning keeps only real forward points: over-segmented duplicates (same score
+    twice) and OCR garbage (a backwards or unreadable read) are dropped, and the winner is
+    the team whose score advanced."""
+    from badminton.doubles import points
+    rows = [
+        {"rally": 1, "a": 1, "b": 0},   # A scores
+        {"rally": 2, "a": 1, "b": 0},   # duplicate (over-segmented) — drop
+        {"rally": 3, "a": 1, "b": 1},   # B scores
+        {"rally": 4, "a": None, "b": None},  # OCR miss — drop
+        {"rally": 5, "a": 0, "b": 0},   # regression (garbage) — drop
+        {"rally": 6, "a": 2, "b": 1},   # A scores
+    ]
+    pts = points.clean_set_scores(rows)
+    assert [(p["rally"], p["a"], p["b"], p["winner"]) for p in pts] == [
+        (1, 1, 0, "A"), (3, 1, 1, "B"), (6, 2, 1, "A")]
+
+
+def test_points_build_maps_rows_to_teams_and_detects_winner():
+    """build(): top/bot rows map to teams A/B via top_team; final + set winner are derived
+    from the accepted trajectory, and a longest-run is counted."""
+    from badminton.doubles import points
+    # one set: A pulls ahead 3-1. rally_scores = (start,end,top,bot); top_team='A' → a=top.
+    rally_scores = [(0, 9, 1, 0), (10, 19, 2, 0), (20, 29, 2, 1), (30, 39, 3, 1)]
+    rsides = [{"set": 1} for _ in rally_scores]
+    out = points.build(rally_scores, rsides, fps=30.0, top_team="A")
+    s = out["sets"][0]
+    assert s["final"] == {"a": 3, "b": 1} and s["winner"] == "A"
+    assert out["runs"]["A"] == 2          # A won rallies 1,2 back to back (then B, then A)
+    # flipping top_team swaps the rows: now bottom row is team A
+    flipped = points.build(rally_scores, rsides, fps=30.0, top_team="B")
+    assert flipped["sets"][0]["final"] == {"a": 1, "b": 3} and flipped["sets"][0]["winner"] == "B"
+
+
 def _run() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

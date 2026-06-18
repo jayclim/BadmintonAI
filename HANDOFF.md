@@ -16,6 +16,31 @@ dashboard first → tactical commentary later · singles first → doubles later
 
 ## 2. Current status (as of 2026-06-18)
 
+- **DOUBLES — ANNOTATED VIDEO + POINTS TAB + PER-PLAYER COURT (2026-06-18).** The doubles
+  surface now matches the singles dashboard's shape and has AI-annotated footage.
+  - **Annotated clips (NEW):** `doubles/render.py` bakes the reprojected court + 4 pose
+    skeletons/boxes + name/front-back role labels + the attack/defence formation banner +
+    the machine-read score into a 540p H.264 clip — the doubles analogue of
+    `render_overlay.render(ai_only=True)` (no shuttle/shot calls). `scripts/render_doubles_clips.py`
+    rendered all 163 rallies → `web/public/clips/wtf_2024_md_sf/f<a>-<b>.mp4` (176 MB, git-tracked
+    like singles). A shared **AI-overlay navbar toggle** (`useOverlayPref`, same hook as singles)
+    swaps Film + Lab footage between the annotated MP4 and the YouTube embed.
+  - **Six views now** (added **Points**): per-set score worms + sets-won + longest momentum run +
+    short/mid/long win splits, all from the per-rally scoreboard OCR (`doubles/points.py`, pure +
+    unit-tested). Route slugs overview/points/court/patterns/film/lab.
+  - **Court view is now PER-PLAYER (4 cards, was 2):** `movement.player_movement` emits one
+    heatmap + distance/speed/coverage/zone card per person, keyed by (set, team, within-pair idx)
+    so it's swap-safe; a SET selector picks the game. **Set 1 carries roster athlete names**; sets
+    2-3 show the pair label + P1/P2 (only set 1 is identity-anchored — no guessed names).
+  - **Perf fix:** `roles.roles_df` gained optional `start`/`end` (windowed) — it was scanning all
+    405k track rows per clip; scoping it to the rally window cut per-clip render ~13× (21s→1.6s).
+    The export OCRs per-rally scores ONCE and feeds both set detection and Points.
+  - **Verified:** `next build` emits all 6 routes; 163/163 clips mapped; headless-Chrome screenshots
+    of points/court/film/lab all render real data; `tests/test_doubles.py` **35/35** (added points
+    cases). **Isolation held** — all changes under `doubles/` + the doubles web surface + new files;
+    singles dashboard untouched. Still deferred: LLM coach notes (notes are rule-based); shot-level
+    features (shot mix/response matrix/openings) still need 4-slot hit attribution.
+
 - **DOUBLES — FULL-MATCH, MULTI-SET DASHBOARD SHIPPED (2026-06-18).** The whole doubles
   broadcast (`wtf_2024_md_sf`, 92.6 min) is now tracked end to end and the COURTSIDE doubles
   surface (`/d/<id>`) covers the **full 3-set match**, per team, across the end-swaps.
@@ -32,8 +57,8 @@ dashboard first → tactical commentary later · singles first → doubles later
   - **Verified:** 3 sets detected (47/47/69 rallies, 163 total, 28.4 min rally time); decider
     11-pt swap located at the right rally (set-3 near-pair flips A→B at rally 117); set-1 attack
     split B 72% / A 39% matches who won set 1 (INA 21-17); coverage 93.5%. **Tests 33/33.**
-  - **Five doubles views** (all under `web/components/doubles/`, route slugs
-    overview/court/patterns/film/lab): Overview (+ rule-based scouting notes), Court (per-team
+  - **Doubles views** (all under `web/components/doubles/`; now six — see the newer bullet
+    above for Points + per-player Court + annotated video): Overview (+ rule-based scouting notes), Court (per-team
     movement heatmaps), Patterns (formation flow), Film room (4-player 2D replay + rotation
     markers), AI Lab (label-free validation showcase). Web is fully team-keyed
     (`lib/doubles.ts` `Team="A"|"B"`, `TEAM_COLOR`); dot/timeline colours follow each team
@@ -41,8 +66,9 @@ dashboard first → tactical commentary later · singles first → doubles later
     gained `formation_flow`.
   - **Open / caveats:** rally segmentation is tracks-only → slightly over-segments (163 windows
     vs ~127 actual points); per-player net-hunter only for roster-named sets (set 1 — add set
-    2/3 rosters to `matches.yaml` to extend); Points/momentum view + LLM coach notes deferred;
-    shot-level features still blocked on 4-slot hit attribution. Full detail: `docs/DOUBLES.md`.
+    2/3 rosters to `matches.yaml` to extend); LLM coach notes deferred (Points/momentum view
+    now SHIPPED — see the newer bullet); shot-level features still blocked on 4-slot hit
+    attribution. Full detail: `docs/DOUBLES.md`.
   - **Isolation held:** all changes under `doubles/` + tests/docs; singles dashboard untouched.
     The working tree still carries pre-existing **unstaged singles edits that are not part of
     this work** (`web/components/views/*`, `court.tsx`, `ui.tsx`, `fmt.ts`, `globals.css`,

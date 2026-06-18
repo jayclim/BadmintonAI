@@ -86,14 +86,18 @@ def _pair_roles(a: pd.Series, b: pd.Series) -> dict:
     }
 
 
-def roles_df(match_id: str) -> pd.DataFrame:
+def roles_df(match_id: str, start: int | None = None, end: int | None = None) -> pd.DataFrame:
     """One row per (frame, side) where BOTH that side's players are tracked, with
-    front/back/left/right slot labels, depth/lateral gaps, and formation."""
+    front/back/left/right slot labels, depth/lateral gaps, and formation. Pass start/end to
+    scope to a frame window (cheap for per-rally renders — avoids scanning the whole match)."""
     con = db.connect(read_only=True)
-    df = con.execute(
-        "SELECT frame_num, player_id, court_x, court_y FROM tracks "
-        "WHERE match_id=? AND player_id IN ('near','near2','far','far2') "
-        "ORDER BY frame_num", [match_id]).fetch_df()
+    q = ("SELECT frame_num, player_id, court_x, court_y FROM tracks "
+         "WHERE match_id=? AND player_id IN ('near','near2','far','far2')")
+    params: list = [match_id]
+    if start is not None and end is not None:
+        q += " AND frame_num BETWEEN ? AND ?"
+        params += [start, end]
+    df = con.execute(q + " ORDER BY frame_num", params).fetch_df()
     con.close()
 
     rows = []

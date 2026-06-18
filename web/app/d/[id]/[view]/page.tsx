@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import DoublesDashboard from "@/components/DoublesDashboard";
 import type { DoublesIndex } from "@/lib/doubles";
 
-const VIEWS = ["overview", "court", "patterns", "film", "lab"] as const;
+const VIEWS = ["overview", "points", "court", "patterns", "film", "lab"] as const;
 
 export function generateStaticParams() {
   const p = path.join(process.cwd(), "public", "data", "doubles_index.json");

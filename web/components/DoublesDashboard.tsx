@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { useDoublesMatch } from "@/lib/doubles";
 import type { DoublesMatch } from "@/lib/doubles";
 import { fmtClock } from "@/lib/fmt";
+import { useOverlayPref } from "@/lib/overlay";
 import { AiTag } from "@/components/ui";
 import ThemeToggle from "@/components/ThemeToggle";
 import DoublesOverview from "@/components/doubles/Overview";
+import DoublesPoints from "@/components/doubles/Points";
 import DoublesMovement from "@/components/doubles/Movement";
 import DoublesPatterns from "@/components/doubles/Patterns";
 import DoublesLab from "@/components/doubles/Lab";
@@ -15,6 +17,7 @@ import DoublesFilm from "@/components/doubles/Film";
 
 const TABS: [string, string][] = [
   ["overview", "Overview"],
+  ["points", "Points"],
   ["court", "Court"],
   ["patterns", "Patterns"],
   ["film", "Film room"],
@@ -30,6 +33,7 @@ export interface DoublesViewProps {
 export default function DoublesDashboard({ id, view }: { id: string; view: string }) {
   const { data: d, error } = useDoublesMatch(id);
   const router = useRouter();
+  const [overlayOn, setOverlayOn] = useOverlayPref();
   const goRally = (rally: number) => router.push(`/d/${id}/film/?r=${rally}`);
 
   return (
@@ -58,7 +62,19 @@ export default function DoublesDashboard({ id, view }: { id: string; view: strin
             );
           })}
         </div>
-        <span className="ml-auto mono text-[10px] tracking-[0.16em] px-2 py-1 rounded border border-[var(--line)] text-dim shrink-0">
+        <button
+          onClick={() => setOverlayOn(!overlayOn)}
+          className="ml-auto mono text-[10.5px] tracking-[0.12em] px-2.5 py-1.5 rounded-md border transition-colors shrink-0"
+          style={{
+            borderColor: overlayOn ? "var(--ai)" : "var(--line)",
+            color: overlayOn ? "var(--ai)" : "var(--dim)",
+            background: overlayOn ? "var(--ai-soft)" : "transparent",
+          }}
+          title="Play AI-annotated clips (4-player pose, names, roles, formation, score OCR baked into the video) instead of the raw broadcast — applies to all footage and persists"
+        >
+          {overlayOn ? "● AI OVERLAY ON" : "○ AI OVERLAY OFF"}
+        </button>
+        <span className="mono text-[10px] tracking-[0.16em] px-2 py-1 rounded border border-[var(--line)] text-dim shrink-0">
           DOUBLES
         </span>
         <ThemeToggle />
@@ -86,6 +102,7 @@ export default function DoublesDashboard({ id, view }: { id: string; view: strin
         <>
           <ScoreHeader d={d} />
           {view === "overview" && <DoublesOverview d={d} id={id} goRally={goRally} />}
+          {view === "points" && <DoublesPoints d={d} id={id} goRally={goRally} />}
           {view === "court" && <DoublesMovement d={d} id={id} goRally={goRally} />}
           {view === "patterns" && <DoublesPatterns d={d} id={id} goRally={goRally} />}
           {view === "film" && <DoublesFilm d={d} id={id} goRally={goRally} />}

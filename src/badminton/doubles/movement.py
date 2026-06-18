@@ -194,6 +194,61 @@ def team_movement(match_id: str, fps: float, rally_sides: list[dict]) -> dict[st
     return out
 
 
+def player_movement(match_id: str, fps: float, rally_sides: list[dict],
+                    team_names: dict | None) -> list[dict]:
+    """Per-PLAYER movement, one entry per (set, team, within-pair index) — i.e. FOUR
+    players per set, the per-person answer the team-combined `team_movement` can't give.
+
+    Keyed by TEAM (not court slot) so it survives the end-swaps: each rally's near side
+    feeds `near_pair`, its far side feeds `far_pair`, and within a side the two tracker
+    slots become within-pair indices 0/1 (near/far -> 0, near2/far2 -> 1). Far positions
+    are mirrored onto the near half (`_to_near_half`) so all four players are comparable.
+    Distance/seconds accumulate PER rally; positions accumulate for heat/coverage/zones.
+
+    Names come from `team_names` ((team, idx) -> name) only for set 1 (the roster-anchored
+    set); other sets carry name=None and the web shows the (always-known) pair name + P1/P2.
+    `rally_sides`: [{start, end, set, near_pair, far_pair}, ...]."""
+    team_names = team_names or {}
+    con = db.connect(read_only=True)
+    acc: dict[tuple, dict] = {}
+    for r in rally_sides:
+        a, b, sn = r["start"], r["end"], r["set"]
+        df = con.execute(
+            "SELECT frame_num, player_id, court_x, court_y FROM tracks WHERE match_id=? "
+            "AND player_id IN ('near','near2','far','far2') AND frame_num BETWEEN ? AND ? "
+            "ORDER BY frame_num", [match_id, a, b]).fetch_df()
+        if df.empty:
+            continue
+        for slots, team in ((("near", "near2"), r["near_pair"]),
+                            (("far", "far2"), r["far_pair"])):
+            for idx, slot in enumerate(slots):
+                g = df[df.player_id == slot]
+                if len(g) < 3:
+                    continue
+                arr = g[["frame_num", "court_x", "court_y"]].to_numpy(float)
+                f = arr[:, 0]
+                x, y = _smooth(arr[:, 1]), _smooth(arr[:, 2])
+                dt = np.diff(f) / fps
+                step = np.hypot(np.diff(x), np.diff(y))
+                sp = np.divide(step, dt, out=np.zeros_like(step), where=dt > 0)
+                good = (sp <= MAX_SPEED) & (dt > 0)
+                t = acc.setdefault((sn, team, idx), {"dist": 0.0, "secs": 0.0, "pos": []})
+                t["dist"] += float(step[good].sum())
+                t["secs"] += float((f[-1] - f[0]) / fps)
+                t["pos"].append(_to_near_half(np.column_stack([x, y]), slot))
+    con.close()
+    out: list[dict] = []
+    for (sn, team, idx), t in sorted(acc.items()):
+        m = _pos_metrics(t["dist"], t["secs"], t["pos"])
+        if m:
+            # name ONLY set 1 (the roster-anchored set). In later sets the pairs swapped
+            # ends and the within-pair index isn't re-anchored, so naming it would be a
+            # 50/50 guess — leave None and let the web show the pair label + P1/P2.
+            name = team_names.get((team, idx)) if sn == 1 else None
+            out.append(dict(set=int(sn), team=team, idx=idx, name=name, **m))
+    return out
+
+
 REACH_M = 1.5          # how far a player can plausibly cover a cell (racket + lunge)
 CTRL_GRID = (8, 10)    # nx, ny cells over one half (x in [0,W], y in [0,NET])
 

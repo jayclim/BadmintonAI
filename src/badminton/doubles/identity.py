@@ -83,6 +83,28 @@ def resolve(match_id: str, set_no: int = 1) -> dict[str, str]:
     return {slot: quad_names[q] for slot, q in slot_quad.items()}
 
 
+def team_slot_names(match_id: str) -> dict[tuple[str, int], str] | None:
+    """Map (team, within-pair index 0/1) -> athlete name, for the WHOLE match.
+
+    Identity that survives the set end-swaps has to be keyed by TEAM, not by the
+    geometric court slot (which holds a different pair each game). We only have an exact
+    roster for set 1 (the serve-quadrant anchor), and that's enough to NAME the teams:
+    team A := the set-1 near pair, team B := the far pair (the same anchor sets.py uses).
+    Within a pair the two members are indexed 0/1 by their set-1 tracker slots
+    (A0=near, A1=near2, B0=far, B1=far2).
+
+    Returns None when no set-1 roster is configured — callers then fall back to the pair
+    display name + a P1/P2 index, which is honest (the team is always known; only the
+    within-pair split is). We deliberately do NOT guess which physical player is which in
+    later sets, since the pairs swap ends and only set 1 is anchored."""
+    try:
+        slot_name = resolve(match_id, 1)
+    except SystemExit:
+        return None
+    return {("A", 0): slot_name.get("near"), ("A", 1): slot_name.get("near2"),
+            ("B", 0): slot_name.get("far"), ("B", 1): slot_name.get("far2")}
+
+
 def names_df(match_id: str, set_no: int = 1) -> pd.DataFrame:
     """All tracked rows for the match with a `name` column (names carried by slot).
     NOTE: carry-by-slot is only as good as slot persistence — serve re-anchoring (below)

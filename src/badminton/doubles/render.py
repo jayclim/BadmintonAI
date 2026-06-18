@@ -1,8 +1,14 @@
 """Doubles annotated rally renderer (ISOLATED, Phase 1) — the visual payoff.
 
-Writes an MP4 of a rally with: the reprojected court, the four players boxed and labelled
-with name (if a roster/mapping is given) + front/back role, and a banner showing each
-side's debounced formation. Self-contained — reads `tracks` + the homography only.
+Writes an MP4 of a rally with: the reprojected court, the four players boxed + pose
+skeletons, labelled with name (per-set roster when known) + front/back role, a banner
+showing each side's debounced formation, and the machine-read scoreboard score. It is the
+doubles analogue of `render_overlay.render(ai_only=True)` — but doubles has no shuttle /
+shot calls, so the annotations are the 4-player pose + roles + formation + score.
+
+Self-contained per the isolation rule: reads `tracks` + the homography + the doubles
+sibling modules, plus low-level `scoreboard` for the OCR score readout. Encodes to a
+web-weight 540p H.264 clip (raw mp4v -> ffmpeg libx264), matching render_overlay.
 
 CLI:
   PYTHONPATH=src python -m badminton.doubles.render <match_id> START END [-o out.mp4] [--set N]
@@ -11,14 +17,34 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import subprocess
+from pathlib import Path
 
 import numpy as np
 
 from .. import config, court, db
 from . import identity, roles
 
-COL = {"near": (80, 255, 80), "near2": (255, 200, 0),       # BGR: green / cyan (near pair)
-       "far": (60, 255, 255), "far2": (255, 60, 255)}        #      yellow / magenta (far pair)
+# BGR per slot: near pair green / cyan, far pair yellow / magenta (matches the 2D replay hues)
+COL = {"near": (80, 255, 80), "near2": (255, 200, 0),
+       "far": (60, 255, 255), "far2": (255, 60, 255)}
+
+# COCO-17 skeleton bones (keypoint index pairs) — same as render_overlay.SKELETON
+SKELETON = [(5, 7), (7, 9), (6, 8), (8, 10), (5, 6), (5, 11), (6, 12), (11, 12),
+            (11, 13), (13, 15), (12, 14), (14, 16), (0, 5), (0, 6)]
+KP_MIN_CONF = 0.3
+
+
+def _draw_skeleton(frame, kp51, col) -> None:
+    import cv2
+    kp = np.asarray(kp51, dtype=np.float32).reshape(17, 3)
+    for a, b in SKELETON:
+        if kp[a, 2] >= KP_MIN_CONF and kp[b, 2] >= KP_MIN_CONF:
+            cv2.line(frame, (int(kp[a, 0]), int(kp[a, 1])),
+                     (int(kp[b, 0]), int(kp[b, 1])), col, 2)
+    for x, y, c in kp:
+        if c >= KP_MIN_CONF:
+            cv2.circle(frame, (int(x), int(y)), 3, (255, 255, 255), -1)
 
 
 def _court_lines(H: np.ndarray):
@@ -37,7 +63,36 @@ def _court_lines(H: np.ndarray):
     return [(px(a), px(b)) for a, b in segs]
 
 
-def render_rally(match_id: str, start: int, end: int, out_path, names: dict | None = None) -> str:
+def _score_events(match_id: str, start: int, end: int, samples: int = 6):
+    """Debounced (frame, "top-bot") scoreboard reads across the rally, for a live readout.
+    Reuses the singles scoreboard OCR; failures degrade to no score (never crash a render)."""
+    try:
+        import cv2
+        from .. import scoreboard as sb
+        box = sb.calibrate_box(match_id)
+        if box is None:
+            return []
+        tpl = sb._load_templates()
+        cap = cv2.VideoCapture(str(config.REPO_ROOT / config.get_match(match_id)["video_path"]))
+        out = []
+        for f in np.linspace(start, end, samples).astype(int):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(f))
+            ok, fr = cap.read()
+            r = sb.read_frame(fr, box, tpl) if ok else None
+            if r:
+                out.append((int(f), f"{r['top'][-1]}-{r['bot'][-1]}"))
+        cap.release()
+        return out
+    except Exception:
+        return []
+
+
+def render_rally(match_id: str, start: int, end: int, out_path,
+                 names: dict | None = None, score: str | None = None,
+                 out_height: int | None = 540, crf: int = 27) -> str:
+    """`score` ("top-bot") is the machine-read scoreboard for the rally; pass it from the
+    caller (which already OCRs per-rally scores) to skip the in-render OCR. When None, we
+    sample it here. The score is constant within a rally, so one value is shown throughout."""
     import cv2
 
     m = config.get_match(match_id)
@@ -47,15 +102,14 @@ def render_rally(match_id: str, start: int, end: int, out_path, names: dict | No
 
     con = db.connect(read_only=True)
     df = con.execute(
-        "SELECT frame_num, player_id, bbox FROM tracks WHERE match_id=? "
+        "SELECT frame_num, player_id, bbox, keypoints FROM tracks WHERE match_id=? "
         "AND player_id IN ('near','near2','far','far2') AND frame_num BETWEEN ? AND ?",
         [match_id, start, end]).fetch_df()
     con.close()
     by_frame = {f: g for f, g in df.groupby("frame_num")}
 
-    # debounced formation + front slot, per (frame, side)
-    rd = roles.roles_df(match_id)
-    rd = rd[(rd.frame_num >= start) & (rd.frame_num <= end)]
+    # debounced formation + front slot, per (frame, side) — scoped to the rally window
+    rd = roles.roles_df(match_id, start, end)
     form, front = {}, {}
     for side in ("near", "far"):
         s = rd[rd.side == side].sort_values("frame_num")
@@ -65,10 +119,16 @@ def render_rally(match_id: str, start: int, end: int, out_path, names: dict | No
     for r in rd.itertuples():
         front[(r.frame_num, r.side)] = r.front
 
+    # one stable score for the whole rally: use the caller's value, else OCR it once
+    if score is None:
+        ev = _score_events(match_id, start, end, samples=3)
+        score = ev[-1][1] if ev else None
+
     cap = cv2.VideoCapture(str(config.REPO_ROOT / m["video_path"]))
     cap.set(cv2.CAP_PROP_POS_FRAMES, start)
     wpx, hpx = int(cap.get(3)), int(cap.get(4))
-    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (wpx, hpx))
+    raw_out = Path(out_path).with_name("_raw_" + Path(out_path).name)
+    writer = cv2.VideoWriter(str(raw_out), cv2.VideoWriter_fourcc(*"mp4v"), fps, (wpx, hpx))
 
     for fr in range(start, end + 1):
         ok, frame = cap.read()
@@ -79,22 +139,38 @@ def render_rally(match_id: str, start: int, end: int, out_path, names: dict | No
         g = by_frame.get(fr)
         if g is not None:
             for r in g.itertuples(index=False):
-                pid, (cx, cy, w, h) = r.player_id, r.bbox
+                pid, (cx, cy, w, h), kp = r.player_id, r.bbox, r.keypoints
                 side = "near" if pid in ("near", "near2") else "far"
                 role = "front" if front.get((fr, side)) == pid else "back"
                 label = f"{names.get(pid, pid) if names else pid} [{role}]"
                 col = COL[pid]
                 cv2.rectangle(frame, (int(cx - w / 2), int(cy - h / 2)),
                               (int(cx + w / 2), int(cy + h / 2)), col, 2)
+                if kp is not None:
+                    _draw_skeleton(frame, kp, col)
                 cv2.putText(frame, label, (int(cx - w / 2), int(cy - h / 2) - 6),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
+        # formation banner (top-left)
         cv2.rectangle(frame, (0, 0), (wpx, 28), (0, 0, 0), -1)
         cv2.putText(frame, f"near: {form.get((fr, 'near'), '-')}    far: {form.get((fr, 'far'), '-')}"
                     f"    frame {fr}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        # machine-read score (top-right), constant through the rally
+        if score:
+            cv2.rectangle(frame, (wpx - 184, 32), (wpx - 8, 64), (20, 26, 22), -1)
+            cv2.putText(frame, f"AI score {score}", (wpx - 176, 55),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (60, 245, 212), 2)
         writer.write(frame)
 
     cap.release()
     writer.release()
+
+    # transcode to web-weight browser-friendly H.264, drop the raw file
+    cmd = ["ffmpeg", "-y", "-i", str(raw_out), "-c:v", "libx264", "-crf", str(crf),
+           "-preset", "veryfast", "-pix_fmt", "yuv420p", "-movflags", "+faststart"]
+    if out_height:
+        cmd += ["-vf", f"scale=-2:{out_height}"]
+    subprocess.run(cmd + [str(out_path)], check=True, capture_output=True)
+    raw_out.unlink(missing_ok=True)
     print(f"wrote {out_path}")
     return str(out_path)
 

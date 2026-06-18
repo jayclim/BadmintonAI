@@ -5,9 +5,9 @@ import { useMemo } from "react";
 import type { DoublesViewProps } from "@/components/DoublesDashboard";
 import type { DSide, Team } from "@/lib/doubles";
 import { TEAM_COLOR, useDoublesReplay } from "@/lib/doubles";
-import { DoublesReplay2D, FormationTimeline } from "@/components/doubles/court4";
+import { DoublesReplay2D, DoublesVideo, FormationTimeline } from "@/components/doubles/court4";
 import { Card, Section } from "@/components/ui";
-import { fmtClock, ytEmbed } from "@/lib/fmt";
+import { fmtClock } from "@/lib/fmt";
 
 export default function DoublesFilm({ d, id, goRally }: DoublesViewProps) {
   const sp = useSearchParams();
@@ -81,18 +81,7 @@ export default function DoublesFilm({ d, id, goRally }: DoublesViewProps) {
         </Card>
 
         <div className="space-y-5">
-          {meta.youtubeId && row && (
-            <div className="aspect-video rounded-md overflow-hidden border border-[var(--line)] bg-black">
-              <iframe
-                key={`${rally}-yt`}
-                src={ytEmbed(meta.youtubeId, row.t0, row.t1)}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowFullScreen
-                title="rally clip"
-              />
-            </div>
-          )}
+          {row && <DoublesVideo row={row} youtubeId={meta.youtubeId} />}
 
           {rep && (
             <Card>
