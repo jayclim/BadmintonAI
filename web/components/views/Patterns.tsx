@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ViewProps } from "@/components/Dashboard";
-import { Card, Dot, Pills, Section, WatchBtn } from "@/components/ui";
+import { Card, Dot, Pills, Section, WatchBtn, useChartTip } from "@/components/ui";
 import { Butterfly, SplitBar } from "@/components/charts";
 import type { P } from "@/lib/types";
 import { SHOT_ORDER } from "@/lib/types";
@@ -12,6 +12,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
   const { meta, insights } = d;
   const names = meta.players;
   const [plen, setPlen] = useState<"2 shots" | "3 shots">("2 shots");
+  const epTip = useChartTip();
   const pats = plen === "2 shots" ? insights.patterns2 : insights.patterns3;
   const ep = insights.errorPressure;
   const bh = insights.backhand;
@@ -29,9 +30,9 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
       <section className="grid lg:grid-cols-5 gap-4 [&>*]:min-w-0">
         <Card className="lg:col-span-3">
           <Section
-            kicker="REHEARSABLE SITUATIONS"
+            kicker="REPEATED ENDINGS"
             title="Rally-ending exchanges"
-            hint="The last shots before the point ended, and who profited. A lopsided pattern is drillable — recognize the setup shot and break it early."
+            hint="The last shots before the point ended, and who profited. A lopsided pattern is worth drilling — recognize the setup shot and break it early."
           >
             <Pills options={["2 shots", "3 shots"] as const} value={plen} onChange={setPlen} />
           </Section>
@@ -80,15 +81,15 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
       {/* coach scouting: if-then response matrix */}
       <section>
         <Section
-          kicker="THE IF-THEN SCOUTING TABLE"
-          title="How he answers"
-          hint="When a shot comes at him, what does he play back — and how do those rallies end? Predictable answers are attackable: know the reply before he hits it, and be standing where it goes."
+          kicker="RESPONSE TENDENCIES"
+          title="Typical replies"
+          hint="For each incoming shot, the most common replies — and how often those rallies were won. A predictable reply can be anticipated and attacked."
         />
         <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => (
             <Card key={p} delay={(i + 1) as 1}>
               <div className="text-[13.5px] font-semibold mb-3" style={{ color: PCOLOR[p] }}>
-                {names[p]} — most predictable answers first
+                {names[p]} — most predictable replies first
               </div>
               <div className="space-y-3">
                 {[...insights.responseMatrix[p]]
@@ -134,8 +135,8 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
       <section>
         <Section
           kicker="THE FIRST THREE SHOTS"
-          title="Opening playbook"
-          hint="Each serve, what comes back, and who profits. A return that drops the server's win rate is the receive to drill; a serve that holds 60%+ is the one to keep trusting."
+          title="Openings"
+          hint="Each serve type, the returns it drew, and the server's win rate against each. A return that drops the server's win rate is the one to drill."
         />
         <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => (
@@ -195,7 +196,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
             title="Forced vs unforced errors"
             hint="Unforced errors came from a comfortable position — free points to claw back in training. Forced errors were earned by the opponent's placement."
           />
-          <div className="space-y-4 mt-2">
+          <div className="relative space-y-4 mt-2" ref={epTip.ref}>
             {(["B", "A"] as P[]).map((p) => {
               const e = ep[p];
               const known = e.forced + e.unforced || 1;
@@ -213,16 +214,29 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
                   <div className="flex h-5 rounded overflow-hidden">
                     <div
                       style={{ width: `${(100 * e.forced) / known}%`, background: "var(--warn)", opacity: 0.85 }}
-                      title={`forced: ${e.forced}`}
+                      {...epTip.on(
+                        <span>
+                          <span style={{ color: PCOLOR[p] }}>{names[p]}</span>:{" "}
+                          <b className="mono">{e.forced}</b> forced{" "}
+                          <span className="text-dim">({Math.round((100 * e.forced) / known)}%)</span>
+                        </span>,
+                      )}
                     />
                     <div
                       style={{ width: `${(100 * e.unforced) / known}%`, background: "var(--err)", opacity: 0.85 }}
-                      title={`unforced: ${e.unforced}`}
+                      {...epTip.on(
+                        <span>
+                          <span style={{ color: PCOLOR[p] }}>{names[p]}</span>:{" "}
+                          <b className="mono">{e.unforced}</b> unforced{" "}
+                          <span className="text-dim">({Math.round((100 * e.unforced) / known)}%)</span>
+                        </span>,
+                      )}
                     />
                   </div>
                 </div>
               );
             })}
+            {epTip.tipEl}
             <div className="flex gap-4 text-[11.5px] text-mut">
               <span><span className="inline-block w-2 h-2 rounded-sm mr-1.5" style={{ background: "var(--warn)" }} />forced (scrambling)</span>
               <span><span className="inline-block w-2 h-2 rounded-sm mr-1.5" style={{ background: "var(--err)" }} />unforced (comfortable)</span>
@@ -259,7 +273,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
           ) : (
             <div className="mt-3 p-4 rounded border border-dashed border-[var(--line)] text-[13px] text-mut leading-relaxed">
               Backhand detection needs wing-level labels that the CV chain doesn&apos;t infer yet
-              — the pose model sees the body, not the grip. Honest gap, on the roadmap.
+              — the pose model sees the body, not the grip.
               {src === "ai" && (
                 <span className="block mt-2 text-dim">
                   Switch to <b className="text-ink">GROUND TRUTH</b> to see the labeled version.
@@ -274,8 +288,9 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
 }
 
 function Dumbbell({ usage, err }: { usage: number; err: number }) {
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <div className="relative h-6">
+    <div className="relative h-6" ref={ref}>
       <div className="absolute inset-x-0 top-1/2 h-px bg-[var(--line)]" />
       <div
         className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded"
@@ -286,13 +301,16 @@ function Dumbbell({ usage, err }: { usage: number; err: number }) {
           opacity: 0.6,
         }}
       />
-      <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full -translate-y-1/2 -translate-x-1/2 border border-[#06130c]"
-        style={{ left: `${usage}%`, background: "var(--mut)" }} title={`usage ${usage}%`} />
-      <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full -translate-y-1/2 -translate-x-1/2 border border-[#06130c]"
-        style={{ left: `${err}%`, background: "var(--err)" }} title={`errors ${err}%`} />
+      <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full -translate-y-1/2 -translate-x-1/2 border border-[var(--contact-ink)]"
+        style={{ left: `${usage}%`, background: "var(--mut)" }}
+        {...on(<span><b className="mono">{usage}%</b> of own shots are backhand</span>)} />
+      <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full -translate-y-1/2 -translate-x-1/2 border border-[var(--contact-ink)]"
+        style={{ left: `${err}%`, background: "var(--err)" }}
+        {...on(<span><b className="mono">{err}%</b> of own rally-ending errors are backhand</span>)} />
       <span className="absolute -top-0.5 mono text-[10px] text-dim" style={{ left: `${Math.max(usage, err) + 3}%` }}>
         {usage}% → {err}%
       </span>
+      {tipEl}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ViewProps } from "@/components/Dashboard";
-import { AiTag, Card, Metric, Section, Select } from "@/components/ui";
+import { AiTag, Card, Metric, Section, Select, useChartTip } from "@/components/ui";
 import { Confusion, HBars, OcrStairs } from "@/components/charts";
 import { Replay2D } from "@/components/court";
 import RallyVideo from "@/components/RallyVideo";
@@ -72,8 +72,8 @@ export default function Lab({ d, id, src }: ViewProps) {
           title="From raw broadcast to scouting report"
           hint={
             sc?.heldOut
-              ? "Every threshold in this chain was tuned on the India Open match — this match is fully HELD OUT. The numbers below are honest out-of-distribution performance."
-              : "Each stage validated against ShuttleSet22 human labels on this match. Numbers are measured, not aspirational."
+              ? "Every threshold in this chain was tuned on the India Open match — this match is fully held out, so the numbers below are out-of-distribution performance."
+              : "Each stage validated against ShuttleSet22 human labels on this match."
           }
         >
           <AiTag text="SHOWCASE" />
@@ -109,9 +109,9 @@ export default function Lab({ d, id, src }: ViewProps) {
       {/* rally x-ray */}
       <section>
         <Section
-          kicker="WATCH THE MODELS WORK"
+          kicker="ONE RALLY, EVERY MODEL"
           title="Rally X-ray"
-          hint="One rally, four synchronized views: the broadcast, the machine-tracked court, and the raw shuttle trajectory with every detected contact. Optic-yellow = machine; dashed gray = the human label, where one exists."
+          hint="One rally, synchronized views: the broadcast, the machine-tracked court, and the raw shuttle trajectory with every detected contact. Yellow = machine; dashed gray = human label, where one exists."
         />
         <div className="max-w-xs mb-3">
           <Select
@@ -166,8 +166,8 @@ export default function Lab({ d, id, src }: ViewProps) {
         <section>
           <Section
             kicker="READING THE BROADCAST GRAPHICS"
-            title="Score OCR, live"
-            hint="The BWF overlay digits are ~12 px — too small for OCR engines, so digit templates are matched directly (bootstrapped once from a labeled match; they transfer across tournaments). The machine reads the score after every rally, which yields winners, set boundaries AND which side each player is on."
+            title="Score OCR"
+            hint="The BWF overlay digits are ~12 px — too small for OCR engines, so digit templates are matched directly (bootstrapped once from a labeled match; they transfer across tournaments). Reading the score after every rally yields winners, set boundaries and which side each player is on. Hover the staircase for each reading."
           />
           <div className="grid lg:grid-cols-[0.9fr_1.4fr] gap-4 [&>*]:min-w-0">
             <Card className="rise-1">
@@ -216,8 +216,8 @@ export default function Lab({ d, id, src }: ViewProps) {
         <section>
           <Section
             kicker="AI VS HUMAN LABELS"
-            title="How honest is the AI mode?"
-            hint="The label-free pipeline strokes matched to ShuttleSet's human annotations (±6 frames). This is the exact gap between the GROUND TRUTH and AI VISION toggles."
+            title="How close does the AI get?"
+            hint="The label-free pipeline's strokes matched to ShuttleSet's human annotations (±6 frames). This is the exact gap between the GROUND TRUTH and AI VISION toggles."
           />
           <div className="grid sm:grid-cols-4 gap-3 mb-4">
             <Card delay={1}>
@@ -268,6 +268,7 @@ export default function Lab({ d, id, src }: ViewProps) {
 function Trajectory({ rep }: { rep: Replay }) {
   const W = 640, H = 300, pad = 34;
   const pts = rep.shuttle;
+  const { ref, on, tipEl } = useChartTip();
   if (!pts.length) return <div className="text-dim text-[12px]">No shuttle track.</div>;
   const f0 = rep.f0, f1 = rep.f1;
   const x = (f: number) => pad + ((W - 2 * pad) * (f - f0)) / Math.max(1, f1 - f0);
@@ -286,22 +287,42 @@ function Trajectory({ rep }: { rep: Replay }) {
     return d;
   };
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-      {rep.refHits.map((h) => (
-        <line key={`r${h.f}`} x1={x(h.f)} y1={pad - 6} x2={x(h.f)} y2={H - pad}
-          stroke="rgba(176,200,186,0.5)" strokeDasharray="3 4" />
-      ))}
-      {rep.hits.map((h) => (
-        <line key={`d${h.f}`} x1={x(h.f)} y1={pad - 6} x2={x(h.f)} y2={H - pad}
-          stroke="var(--ai)" strokeWidth={1.6} opacity={0.85} />
-      ))}
-      <path d={seg(1, yx)} fill="none" stroke="#74c0fc" strokeWidth={1.6} />
-      <path d={seg(2, yy)} fill="none" stroke="#ffa94d" strokeWidth={1.6} />
-      <text x={pad} y={14} fontSize={10} fill="#74c0fc" className="mono">x(px)</text>
-      <text x={pad + 44} y={14} fontSize={10} fill="#ffa94d" className="mono">y(px)</text>
-      <text x={W - pad} y={H - 8} textAnchor="end" fontSize={9.5} fill="var(--dim)" className="mono">
-        VIDEO FRAME →
-      </text>
-    </svg>
+    <div className="relative" ref={ref}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        {rep.refHits.map((h) => (
+          <line key={`r${h.f}`} x1={x(h.f)} y1={pad - 6} x2={x(h.f)} y2={H - pad}
+            stroke="var(--ref-tick)" strokeDasharray="3 4" />
+        ))}
+        {rep.hits.map((h) => (
+          <line key={`d${h.f}`} x1={x(h.f)} y1={pad - 6} x2={x(h.f)} y2={H - pad}
+            stroke="var(--ai)" strokeWidth={1.6} opacity={0.85} />
+        ))}
+        <path d={seg(1, yx)} fill="none" stroke="var(--trace-x)" strokeWidth={1.6} />
+        <path d={seg(2, yy)} fill="none" stroke="var(--trace-y)" strokeWidth={1.6} />
+        {/* invisible wide hover targets over the hit rules */}
+        {rep.refHits.map((h) => (
+          <line key={`rh${h.f}`} x1={x(h.f)} y1={pad - 6} x2={x(h.f)} y2={H - pad}
+            stroke="transparent" strokeWidth={8}
+            {...on(<span>human-labeled hit · <span className="mono">f{h.f}</span></span>)} />
+        ))}
+        {rep.hits.map((h) => (
+          <line key={`dh${h.f}`} x1={x(h.f)} y1={pad - 6} x2={x(h.f)} y2={H - pad}
+            stroke="transparent" strokeWidth={8}
+            {...on(
+              <span>
+                detected: <b style={{ color: "var(--ai)" }}>{h.shot}</b>
+                {h.conf != null && <span className="text-dim"> {(h.conf * 100).toFixed(0)}%</span>}
+                {" · "}<span className="mono">f{h.f}</span>
+              </span>,
+            )} />
+        ))}
+        <text x={pad} y={14} fontSize={10} fill="var(--trace-x)" className="mono">x(px)</text>
+        <text x={pad + 44} y={14} fontSize={10} fill="var(--trace-y)" className="mono">y(px)</text>
+        <text x={W - pad} y={H - 8} textAnchor="end" fontSize={9.5} fill="var(--dim)" className="mono">
+          VIDEO FRAME →
+        </text>
+      </svg>
+      {tipEl}
+    </div>
   );
 }

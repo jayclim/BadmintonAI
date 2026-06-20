@@ -179,7 +179,9 @@ def attribute_hits(match_id: str, hits: list[dict]) -> None:
     for h in hits:
         best, best_d = None, np.inf
         for df_ in (-1, 0, 1):
-            for pid in ("near", "far"):
+            # ponytail: nearest-wrist over all tracked slots — singles only has near/far rows
+            # so near2/far2 simply find nothing; doubles 4-player attribution works for free.
+            for pid in ("near", "near2", "far", "far2"):
                 for (x, y) in refs.get((h["frame"] + df_, pid), []):
                     d = float(np.hypot(x - h["x"], y - h["y"]))
                     if d < best_d:

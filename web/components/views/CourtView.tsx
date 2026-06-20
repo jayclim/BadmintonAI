@@ -7,7 +7,7 @@ import { HBars } from "@/components/charts";
 import { HeatMap, PlacementMap, type Mark } from "@/components/court";
 import type { P } from "@/lib/types";
 import { SHOT_ORDER } from "@/lib/types";
-import { PCOLOR, PHEX } from "@/lib/fmt";
+import { PCOLOR } from "@/lib/fmt";
 
 export default function CourtView({ d, src, goRally }: ViewProps) {
   const { meta, rallies, strokes, insights, movement } = d;
@@ -44,7 +44,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
         <Section
           kicker="SHOT PLACEMENT"
           title="Where their shots land"
-          hint="Each player shown hitting upward into the opponent's half (sides normalized across sets). ★ winners · ✕ rally-ending errors · dots = everything else. ✕ beyond the far baseline = hit long; ✕ just past the net line = netted."
+          hint="Each player shown hitting upward into the opponent's half (sides normalized across sets). ★ winners · ✕ rally-ending errors · dots = everything else. Hover a mark for details; click to watch the rally."
         >
           {src === "ai" && <AiTag text="CV LANDINGS" />}
         </Section>
@@ -80,10 +80,10 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
           <Card delay={3} className="self-start">
             <div className="kicker mb-2">READING THE MAPS</div>
             <ul className="text-[13px] text-mut space-y-2 leading-snug">
-              <li>· A tight ★ cluster is a go-to finishing zone — both where this player kills, and where his opponent should not be standing.</li>
-              <li>· ✕ above the far baseline or outside the lines = shots hit long / wide; ✕ just below the net line = netted.</li>
-              <li>· Filter to one shot (e.g. smash) and compare the two maps — placement variety is a skill you can see.</li>
-              <li>· Click any ★ or ✕ to watch that rally.</li>
+              <li>· A tight ★ cluster is a go-to finishing zone.</li>
+              <li>· ✕ beyond the far baseline or outside the lines = hit long / wide; ✕ just below the net line = netted.</li>
+              <li>· Filter to one shot (e.g. smash) and compare the two maps for placement variety.</li>
+              <li>· Click any mark to watch that rally.</li>
             </ul>
           </Card>
         </div>
@@ -114,7 +114,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
                     {names[p]}
                   </span>
                 </div>
-                <HeatMap heat={mv.heat} color={PHEX[p]} />
+                <HeatMap heat={mv.heat} color={PCOLOR[p]} />
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   <Metric label="DISTANCE" value={mv.distM.toLocaleString()} sub="m in rallies" size="text-[1.5rem]" />
                   <Metric label="SPEED" value={mv.speed} sub="m/s avg" size="text-[1.5rem]" />
@@ -122,9 +122,9 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
                 </div>
                 <div className="mt-3">
                   <div className="flex h-2.5 rounded overflow-hidden">
-                    <div style={{ width: `${mv.front}%`, background: PHEX[p], opacity: 0.95 }} />
-                    <div style={{ width: `${mv.mid}%`, background: PHEX[p], opacity: 0.55 }} />
-                    <div style={{ width: `${mv.back}%`, background: PHEX[p], opacity: 0.3 }} />
+                    <div style={{ width: `${mv.front}%`, background: PCOLOR[p], opacity: 0.95 }} />
+                    <div style={{ width: `${mv.mid}%`, background: PCOLOR[p], opacity: 0.55 }} />
+                    <div style={{ width: `${mv.back}%`, background: PCOLOR[p], opacity: 0.3 }} />
                   </div>
                   <div className="flex justify-between mono text-[10px] text-dim mt-1">
                     <span>FRONT {mv.front}%</span>

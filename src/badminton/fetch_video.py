@@ -16,7 +16,7 @@ from . import config
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def download(match_id: str, url: str | None = None) -> Path:
+def download(match_id: str, url: str | None = None, height: int = 720) -> Path:
     m = config.get_match(match_id)
     url = url or m.get("video_url")
     if not url:
@@ -26,11 +26,13 @@ def download(match_id: str, url: str | None = None) -> Path:
         )
     out = REPO_ROOT / m["video_path"]
     out.parent.mkdir(parents=True, exist_ok=True)
-    # Prefer mp4; keep original fps. (Re-encodes can shift frame count vs ShuttleSet —
-    # we verify alignment downstream.)
+    # Cap to `height` (default 720): the pixel pipeline and every calibrated homography
+    # assume 1280x720, so a 1080p pull would silently break calibration. Prefer mp4; keep
+    # original fps. (Re-encodes can shift frame count vs ShuttleSet — verified downstream.)
+    fmt = (f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/"
+           f"best[height<={height}][ext=mp4]/best[ext=mp4]/best")
     subprocess.run(
-        ["yt-dlp", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-         "--merge-output-format", "mp4", "-o", str(out), url],
+        ["yt-dlp", "-f", fmt, "--merge-output-format", "mp4", "-o", str(out), url],
         check=True,
     )
     config.update_match(match_id, {"video_url": url, "fps": probe_fps(out)})
@@ -62,6 +64,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("match_id")
     ap.add_argument("--url", default=None)
+    ap.add_argument("--height", type=int, default=720, help="max video height (pipeline assumes 720)")
     ap.add_argument("--frame-at", default=None, help="HH:MM:SS — extract one frame")
     ap.add_argument("-o", "--out", default="data/raw/frame.png")
     args = ap.parse_args()
@@ -72,7 +75,7 @@ def main() -> None:
         grab_frame(video, args.frame_at, args.out)
         print(f"frame -> {args.out}")
     else:
-        path = download(args.match_id, args.url)
+        path = download(args.match_id, args.url, args.height)
         print(f"video -> {path}  (fps={probe_fps(path)})")
 
 

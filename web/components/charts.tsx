@@ -4,8 +4,8 @@
 
 import { useMemo, useState } from "react";
 import type { P, Rally } from "@/lib/types";
-import { PHEX } from "@/lib/fmt";
-import { Tip } from "@/components/ui";
+import { PCOLOR } from "@/lib/fmt";
+import { Tip, useChartTip } from "@/components/ui";
 
 /* ── score worm ─────────────────────────────────────────────────────────── */
 
@@ -52,10 +52,10 @@ export function Worm({
         <line x1={padX} y1={H / 2} x2={W - padX + 14} y2={H / 2}
           stroke="var(--line)" strokeDasharray="4 4" />
         <text x={padX - 6} y={padY + 4} textAnchor="end" fontSize={10}
-          fill={PHEX.A} className="mono">{shortName(names.A)} ↑</text>
+          fill={PCOLOR.A} className="mono">{shortName(names.A)} ↑</text>
         <text x={padX - 6} y={H - padY + 2} textAnchor="end" fontSize={10}
-          fill={PHEX.B} className="mono">{shortName(names.B)} ↓</text>
-        <path d={path} fill="none" stroke="rgba(233,242,236,0.5)" strokeWidth={1.8}
+          fill={PCOLOR.B} className="mono">{shortName(names.B)} ↓</text>
+        <path d={path} fill="none" stroke="var(--worm-line)" strokeWidth={1.8}
           className="worm-path" style={{ ["--dash" as string]: 1600 }} />
         {pts.map((p, i) => (
           <g
@@ -66,13 +66,15 @@ export function Worm({
             onMouseLeave={() => setTip(null)}
             onClick={() => onPick(p.r.set, p.r.rally)}
           >
+            {/* generous invisible hit area for hover/click */}
+            <circle r={9} fill="transparent" />
             {/* inner g animates: CSS transform must not override the translate above */}
             <g className="worm-dot" style={{ animationDelay: `${0.2 + (i / pts.length) * 1.0}s` }}>
               {p.r.clutch ? (
                 <rect x={-4.6} y={-4.6} width={9.2} height={9.2} transform="rotate(45)"
-                  fill={PHEX[p.r.winner!]} stroke="#06130c" strokeWidth={0.7} />
+                  fill={PCOLOR[p.r.winner!]} stroke="var(--contact-ink)" strokeWidth={0.7} />
               ) : (
-                <circle r={4.4} fill={PHEX[p.r.winner!]} stroke="#06130c" strokeWidth={0.7} />
+                <circle r={4.4} fill={PCOLOR[p.r.winner!]} stroke="var(--contact-ink)" strokeWidth={0.7} />
               )}
             </g>
           </g>
@@ -96,7 +98,7 @@ export function Worm({
               {tip.r.clutch && <span className="text-warn"> ◆ clutch</span>}
             </div>
             <div>
-              <span style={{ color: PHEX[tip.r.winner!] }}>{names[tip.r.winner!]}</span>
+              <span style={{ color: PCOLOR[tip.r.winner!] }}>{names[tip.r.winner!]}</span>
               {" — "}{tip.r.endPhrase}
             </div>
             <div className="text-dim mt-0.5">
@@ -122,8 +124,9 @@ export function Diverging({
   max: number;
   onPick?: (shot: string, won: boolean) => void;
 }) {
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <div className="space-y-1">
+    <div className="relative space-y-1" ref={ref}>
       {rows.map((r) => (
         <div key={r.shot} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[12px]">
           <div className="flex justify-end items-center gap-1.5">
@@ -132,7 +135,12 @@ export function Diverging({
               className="h-4 rounded-l-sm cursor-pointer hover:opacity-80"
               style={{ width: `${(100 * r.e) / max}%`, background: "var(--err)", minWidth: r.e ? 3 : 0 }}
               onClick={() => onPick?.(r.shot, false)}
-              title={`${r.e} errors — click to watch`}
+              {...on(
+                <span>
+                  <b className="text-err">{r.e}</b> {r.shot} {r.e === 1 ? "error" : "errors"}
+                  <span className="text-dim"> · click to watch</span>
+                </span>,
+              )}
             />
           </div>
           <div className="w-28 text-center text-mut truncate">{r.shot}</div>
@@ -141,17 +149,23 @@ export function Diverging({
               className="h-4 rounded-r-sm cursor-pointer hover:opacity-80"
               style={{ width: `${(100 * r.w) / max}%`, background: "var(--win)", minWidth: r.w ? 3 : 0 }}
               onClick={() => onPick?.(r.shot, true)}
-              title={`${r.w} winners — click to watch`}
+              {...on(
+                <span>
+                  <b className="text-win">{r.w}</b> {r.shot} {r.w === 1 ? "winner" : "winners"}
+                  <span className="text-dim"> · click to watch</span>
+                </span>,
+              )}
             />
             {r.w > 0 && <span className="mono text-win text-[11px]">{r.w}</span>}
           </div>
         </div>
       ))}
       <div className="grid grid-cols-[1fr_auto_1fr] text-[10px] kicker pt-1">
-        <div className="text-right">← POINTS THROWN AWAY</div>
+        <div className="text-right">← ERRORS</div>
         <div className="w-28" />
-        <div>OUTRIGHT WINNERS →</div>
+        <div>WINNERS →</div>
       </div>
+      {tipEl}
     </div>
   );
 }
@@ -170,10 +184,19 @@ export function HBars({
   format?: (v: number) => string;
 }) {
   const max = Math.max(...rows.map((r) => r.value), 0.001);
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <div className="space-y-1.5">
+    <div className="relative space-y-1.5" ref={ref}>
       {rows.map((r) => (
-        <div key={r.label} className="flex items-center gap-2 text-[12px]">
+        <div
+          key={r.label}
+          className="flex items-center gap-2 text-[12px]"
+          {...on(
+            <span>
+              {r.label}: <b className="mono">{format(r.value)}{unit}</b>
+            </span>,
+          )}
+        >
           <div className="w-28 text-right text-mut truncate shrink-0">{r.label}</div>
           <div className="flex-1 h-4 relative">
             <div className="h-full rounded-sm" style={{ width: `${(100 * r.value) / max}%`, background: color, opacity: 0.85 }} />
@@ -181,6 +204,7 @@ export function HBars({
           <div className="mono text-[11px] w-14">{format(r.value)}{unit}</div>
         </div>
       ))}
+      {tipEl}
     </div>
   );
 }
@@ -195,28 +219,41 @@ export function Butterfly({
   names: Record<P, string>;
 }) {
   const max = Math.max(...rows.flatMap((r) => [r.a, r.b]), 1);
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <div>
+    <div className="relative" ref={ref}>
       <div className="grid grid-cols-[1fr_auto_1fr] text-[10.5px] kicker mb-1.5">
-        <div className="text-right" style={{ color: PHEX.B }}>{names.B}</div>
+        <div className="text-right" style={{ color: PCOLOR.B }}>{names.B}</div>
         <div className="w-28" />
-        <div style={{ color: PHEX.A }}>{names.A}</div>
+        <div style={{ color: PCOLOR.A }}>{names.A}</div>
       </div>
       <div className="space-y-1">
         {rows.map((r) => (
-          <div key={r.shot} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[12px]">
+          <div
+            key={r.shot}
+            className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[12px]"
+            {...on(
+              <span>
+                <b>{r.shot}</b> — <span style={{ color: PCOLOR.B }}>{names.B}</span>{" "}
+                <b className="mono">{r.b.toFixed(0)}%</b> ·{" "}
+                <span style={{ color: PCOLOR.A }}>{names.A}</span>{" "}
+                <b className="mono">{r.a.toFixed(0)}%</b> of own shots
+              </span>,
+            )}
+          >
             <div className="flex justify-end items-center gap-1.5">
               <span className="mono text-[10.5px] text-dim">{r.b.toFixed(0)}%</span>
-              <div className="h-3.5 rounded-l-sm" style={{ width: `${(92 * r.b) / max}%`, background: PHEX.B, opacity: 0.8 }} />
+              <div className="h-3.5 rounded-l-sm" style={{ width: `${(92 * r.b) / max}%`, background: PCOLOR.B, opacity: 0.8 }} />
             </div>
             <div className="w-28 text-center text-mut truncate">{r.shot}</div>
             <div className="flex items-center gap-1.5">
-              <div className="h-3.5 rounded-r-sm" style={{ width: `${(92 * r.a) / max}%`, background: PHEX.A, opacity: 0.8 }} />
+              <div className="h-3.5 rounded-r-sm" style={{ width: `${(92 * r.a) / max}%`, background: PCOLOR.A, opacity: 0.8 }} />
               <span className="mono text-[10.5px] text-dim">{r.a.toFixed(0)}%</span>
             </div>
           </div>
         ))}
       </div>
+      {tipEl}
     </div>
   );
 }
@@ -233,8 +270,9 @@ export function LengthCols({
   const buckets = ["short (≤4)", "mid (5–9)", "long (10+)"].filter((b) =>
     rows.some((r) => r.bucket === b),
   );
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <div>
+    <div className="relative" ref={ref}>
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${buckets.length},1fr)` }}>
         {buckets.map((b) => (
           <div key={b}>
@@ -246,13 +284,19 @@ export function LengthCols({
                 if (!r) return <div key={p} className="flex-1" />;
                 return (
                   <div key={p} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                    <span className="mono text-[11px]" style={{ color: PHEX[p] }}>
+                    <span className="mono text-[11px]" style={{ color: PCOLOR[p] }}>
                       {r.win_pct}%
                     </span>
                     <div
                       className="w-full max-w-12 rounded-t-sm"
-                      style={{ height: `${r.win_pct}%`, background: PHEX[p], opacity: 0.85 }}
-                      title={`${names[p]}: won ${r.won}/${r.played}`}
+                      style={{ height: `${r.win_pct}%`, background: PCOLOR[p], opacity: 0.85 }}
+                      {...on(
+                        <span>
+                          <span style={{ color: PCOLOR[p] }}>{names[p]}</span> won{" "}
+                          <b className="mono">{r.won}/{r.played}</b> {b} rallies (
+                          <b className="mono">{r.win_pct}%</b>)
+                        </span>,
+                      )}
                     />
                   </div>
                 );
@@ -265,6 +309,7 @@ export function LengthCols({
           </div>
         ))}
       </div>
+      {tipEl}
     </div>
   );
 }
@@ -275,8 +320,8 @@ export function SplitBar({ a, b }: { a: number; b: number }) {
   const n = a + b || 1;
   return (
     <div className="flex h-3 rounded-sm overflow-hidden w-full min-w-20">
-      <div style={{ width: `${(100 * b) / n}%`, background: PHEX.B, opacity: 0.85 }} />
-      <div style={{ width: `${(100 * a) / n}%`, background: PHEX.A, opacity: 0.85 }} />
+      <div style={{ width: `${(100 * b) / n}%`, background: PCOLOR.B, opacity: 0.85 }} />
+      <div style={{ width: `${(100 * a) / n}%`, background: PCOLOR.A, opacity: 0.85 }} />
     </div>
   );
 }
@@ -289,14 +334,20 @@ export function StackedShare({
   parts: { label: string; value: number; color: string }[];
 }) {
   const total = parts.reduce((s, p) => s + p.value, 0) || 1;
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <div>
+    <div className="relative" ref={ref}>
       <div className="flex h-5 rounded overflow-hidden">
         {parts.map((p) => (
           <div
             key={p.label}
             style={{ width: `${(100 * p.value) / total}%`, background: p.color, opacity: 0.9 }}
-            title={`${p.label}: ${p.value}`}
+            {...on(
+              <span>
+                {p.label}: <b className="mono">{p.value}</b>{" "}
+                <span className="text-dim">({Math.round((100 * p.value) / total)}%)</span>
+              </span>,
+            )}
           />
         ))}
       </div>
@@ -308,6 +359,7 @@ export function StackedShare({
           </span>
         ))}
       </div>
+      {tipEl}
     </div>
   );
 }
@@ -329,41 +381,55 @@ export function Confusion({
   const get = (l: string, p: string) => cells.find((c) => c.label === l && c.pred === p)?.n ?? 0;
   const sz = 30;
   const padL = 96, padT = 78;
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <svg viewBox={`0 0 ${padL + classes.length * sz + 8} ${padT + classes.length * sz + 8}`} className="w-full max-w-xl">
-      {classes.map((l, i) => (
-        <text key={`r${l}`} x={padL - 6} y={padT + i * sz + sz / 2 + 3.5} textAnchor="end"
-          fontSize={10} fill="var(--mut)">{l}</text>
-      ))}
-      {classes.map((p, j) => (
-        <text key={`c${p}`} x={padL + j * sz + sz / 2} y={padT - 8}
-          fontSize={10} fill="var(--mut)"
-          transform={`rotate(-40 ${padL + j * sz + sz / 2} ${padT - 8})`}>{p}</text>
-      ))}
-      {classes.map((l, i) =>
-        classes.map((p, j) => {
-          const n = get(l, p);
-          const share = rowTot[l] ? n / rowTot[l] : 0;
-          return (
-            <g key={`${l}-${p}`}>
-              <rect
-                x={padL + j * sz + 1} y={padT + i * sz + 1} width={sz - 2} height={sz - 2} rx={2}
-                fill={l === p ? "var(--ai)" : "var(--err)"}
-                opacity={n === 0 ? 0.04 : 0.12 + share * 0.8}
-              />
-              {n >= 3 && (
-                <text x={padL + j * sz + sz / 2} y={padT + i * sz + sz / 2 + 3.5}
-                  textAnchor="middle" fontSize={9.5} className="mono"
-                  fill={share > 0.45 ? "#06130c" : "var(--mut)"}>{n}</text>
-              )}
-            </g>
-          );
-        }),
-      )}
-      <text x={padL - 6} y={padT - 30} textAnchor="end" fontSize={9} fill="var(--dim)" className="mono">
-        HUMAN LABEL ↓ · AI →
-      </text>
-    </svg>
+    <div className="relative" ref={ref}>
+      <svg viewBox={`0 0 ${padL + classes.length * sz + 8} ${padT + classes.length * sz + 8}`} className="w-full max-w-xl">
+        {classes.map((l, i) => (
+          <text key={`r${l}`} x={padL - 6} y={padT + i * sz + sz / 2 + 3.5} textAnchor="end"
+            fontSize={10} fill="var(--mut)">{l}</text>
+        ))}
+        {classes.map((p, j) => (
+          <text key={`c${p}`} x={padL + j * sz + sz / 2} y={padT - 8}
+            fontSize={10} fill="var(--mut)"
+            transform={`rotate(-40 ${padL + j * sz + sz / 2} ${padT - 8})`}>{p}</text>
+        ))}
+        {classes.map((l, i) =>
+          classes.map((p, j) => {
+            const n = get(l, p);
+            const share = rowTot[l] ? n / rowTot[l] : 0;
+            return (
+              <g
+                key={`${l}-${p}`}
+                {...(n > 0
+                  ? on(
+                      <span>
+                        human <b>{l}</b> → AI <b>{p}</b>: <b className="mono">{n}</b>{" "}
+                        <span className="text-dim">({Math.round(share * 100)}% of {l}s)</span>
+                      </span>,
+                    )
+                  : {})}
+              >
+                <rect
+                  x={padL + j * sz + 1} y={padT + i * sz + 1} width={sz - 2} height={sz - 2} rx={2}
+                  fill={l === p ? "var(--ai)" : "var(--err)"}
+                  opacity={n === 0 ? 0.04 : 0.12 + share * 0.8}
+                />
+                {n >= 3 && (
+                  <text x={padL + j * sz + sz / 2} y={padT + i * sz + sz / 2 + 3.5}
+                    textAnchor="middle" fontSize={9.5} className="mono"
+                    fill={share > 0.45 ? "var(--contact-ink)" : "var(--mut)"}>{n}</text>
+                )}
+              </g>
+            );
+          }),
+        )}
+        <text x={padL - 6} y={padT - 30} textAnchor="end" fontSize={9} fill="var(--dim)" className="mono">
+          HUMAN LABEL ↓ · AI →
+        </text>
+      </svg>
+      {tipEl}
+    </div>
   );
 }
 
@@ -375,6 +441,7 @@ export function OcrStairs({
   events: { frame: number; set_no: number; top: number; bot: number; winner: string | null }[];
 }) {
   const W = 720, H = 170, pad = 30;
+  const { ref, on, tipEl } = useChartTip();
   if (!events.length) return null;
   const f0 = events[0].frame, f1 = events[events.length - 1].frame;
   const maxS = Math.max(...events.map((e) => Math.max(e.top, e.bot)));
@@ -392,25 +459,49 @@ export function OcrStairs({
   };
   const prevY: Record<string, number> = { top: 0, bot: 0 };
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-      {setBreaks.map((e) => (
-        <g key={e.frame}>
-          <line x1={x(e.frame)} y1={pad - 6} x2={x(e.frame)} y2={H - pad}
-            stroke="var(--line)" strokeDasharray="3 4" />
-          <text x={x(e.frame) + 4} y={pad} fontSize={9.5} fill="var(--dim)" className="mono">
-            SET {e.set_no}
-          </text>
-        </g>
-      ))}
-      {stair("top", "var(--mut)")}
-      {stair("bot", "var(--ai)")}
-      {events.filter((e) => e.winner).map((e) => (
-        <circle key={e.frame} cx={x(e.frame)} cy={y(e[e.winner as "top" | "bot"])} r={2.6}
-          fill={e.winner === "bot" ? "var(--ai)" : "var(--mut)"} />
-      ))}
-      <text x={pad} y={H - 8} fontSize={9.5} fill="var(--dim)" className="mono">
-        BROADCAST TIME → (each step = one machine-read score change)
-      </text>
-    </svg>
+    <div className="relative" ref={ref}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        {setBreaks.map((e) => (
+          <g key={e.frame}>
+            <line x1={x(e.frame)} y1={pad - 6} x2={x(e.frame)} y2={H - pad}
+              stroke="var(--line)" strokeDasharray="3 4" />
+            <text x={x(e.frame) + 4} y={pad} fontSize={9.5} fill="var(--dim)" className="mono">
+              SET {e.set_no}
+            </text>
+          </g>
+        ))}
+        {stair("top", "var(--mut)")}
+        {stair("bot", "var(--ai)")}
+        {events.filter((e) => e.winner).map((e) => (
+          <circle key={e.frame} cx={x(e.frame)} cy={y(e[e.winner as "top" | "bot"])} r={2.6}
+            fill={e.winner === "bot" ? "var(--ai)" : "var(--mut)"} />
+        ))}
+        {/* invisible hover strips, one per event */}
+        {events.map((e, i) => {
+          const x0 = i === 0 ? x(e.frame) - 4 : (x(events[i - 1].frame) + x(e.frame)) / 2;
+          const x1e = i === events.length - 1 ? x(e.frame) + 4 : (x(e.frame) + x(events[i + 1].frame)) / 2;
+          return (
+            <rect
+              key={`h${e.frame}`}
+              x={x0} y={pad - 6} width={Math.max(x1e - x0, 2)} height={H - 2 * pad + 6}
+              fill="transparent"
+              {...on(
+                <span>
+                  <b className="mono">{e.top}–{e.bot}</b> · set {e.set_no}
+                  {e.winner && (
+                    <span className="text-dim"> · point to {e.winner} row</span>
+                  )}
+                  <span className="text-dim block mono text-[10.5px]">frame {e.frame}</span>
+                </span>,
+              )}
+            />
+          );
+        })}
+        <text x={pad} y={H - 8} fontSize={9.5} fill="var(--dim)" className="mono">
+          BROADCAST TIME → (each step = one machine-read score change)
+        </text>
+      </svg>
+      {tipEl}
+    </div>
   );
 }

@@ -6,12 +6,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Heat, P, Replay as ReplayT, Side, Stroke } from "@/lib/types";
 import { COURT } from "@/lib/types";
-import { PHEX } from "@/lib/fmt";
+import { PCOLOR } from "@/lib/fmt";
+import { useChartTip } from "@/components/ui";
 
 const K = 30;
 const W = COURT.w, L = COURT.l, NET = COURT.net;
-const LINE = "rgba(208,235,216,0.55)";
-const LINE_SOFT = "rgba(208,235,216,0.22)";
+const LINE = "var(--court-line)";
+const LINE_SOFT = "var(--court-line-soft)";
 
 /** painted lines of a full court; y grows downward (near court at bottom). */
 export function CourtLines({ half = false }: { half?: boolean }) {
@@ -45,13 +46,13 @@ export function CourtLines({ half = false }: { half?: boolean }) {
     <g>
       <rect
         x={0} y={top * K} width={W * K} height={(L - top) * K}
-        fill="rgba(36,84,62,0.30)" rx={2}
+        fill="var(--court-fill)" rx={2}
       />
       {lines}
       {/* net */}
       <line
         x1={-0.25 * K} y1={NET * K} x2={(W + 0.25) * K} y2={NET * K}
-        stroke="rgba(233,242,236,0.8)" strokeWidth={sw * 1.4} strokeDasharray={`${0.12 * K} ${0.1 * K}`}
+        stroke="var(--court-net)" strokeWidth={sw * 1.4} strokeDasharray={`${0.12 * K} ${0.1 * K}`}
       />
     </g>
   );
@@ -82,16 +83,33 @@ export function PlacementMap({
   marks: Mark[];
   onPick?: (set: number, rally: number) => void;
 }) {
-  const [tip, setTip] = useState<Mark | null>(null);
+  const { ref, on, tipEl } = useChartTip();
+  const tipFor = (m: Mark) => (
+    <span>
+      <span style={{ color: m.kind === "winner" ? "var(--win)" : m.kind === "error" ? "var(--err)" : "var(--mut)" }}>
+        {m.kind === "winner" ? "★ winner" : m.kind === "error" ? "✕ error" : "●"}
+      </span>{" "}
+      {m.label} · set {m.set} rally {m.rally}
+      <span className="text-dim"> · click to watch</span>
+    </span>
+  );
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <svg {...courtSvgProps(false)} className="w-full">
         <CourtLines />
         {marks
           .filter((m) => m.kind === "rally")
           .map((m, i) => (
-            <circle key={i} cx={m.x * K} cy={m.y * K} r={2.6}
-              fill="rgba(216,231,215,0.4)" />
+            <g
+              key={i}
+              transform={`translate(${m.x * K},${m.y * K})`}
+              onClick={() => onPick?.(m.set, m.rally)}
+              className="cursor-pointer"
+              {...on(tipFor(m))}
+            >
+              <circle r={6} fill="transparent" />
+              <circle r={2.6} fill="var(--court-dot)" />
+            </g>
           ))}
         {marks
           .filter((m) => m.kind !== "rally")
@@ -99,15 +117,15 @@ export function PlacementMap({
             <g
               key={`e${i}`}
               transform={`translate(${m.x * K},${m.y * K})`}
-              onMouseEnter={() => setTip(m)}
-              onMouseLeave={() => setTip(null)}
               onClick={() => onPick?.(m.set, m.rally)}
               className="cursor-pointer"
+              {...on(tipFor(m))}
             >
+              <circle r={9} fill="transparent" />
               {m.kind === "winner" ? (
                 <path
                   d={star(7.5)}
-                  fill="var(--win)" stroke="#06130c" strokeWidth={0.8}
+                  fill="var(--win)" stroke="var(--contact-ink)" strokeWidth={0.8}
                 />
               ) : (
                 <path
@@ -122,15 +140,7 @@ export function PlacementMap({
           HITTING FROM HERE ↑
         </text>
       </svg>
-      {tip && (
-        <div className="absolute left-1/2 top-2 -translate-x-1/2 card !rounded px-2.5 py-1.5 text-[11.5px] pointer-events-none z-10"
-          style={{ background: "var(--panel-solid)" }}>
-          <span style={{ color: tip.kind === "winner" ? "var(--win)" : "var(--err)" }}>
-            {tip.kind === "winner" ? "★" : "✕"}
-          </span>{" "}
-          {tip.label} · set {tip.set} rally {tip.rally} · click to watch
-        </div>
-      )}
+      {tipEl}
     </div>
   );
 }
@@ -149,24 +159,34 @@ function star(r: number) {
 
 export function HeatMap({ heat, color }: { heat: Heat; color: string }) {
   const max = Math.max(...heat.cells.map((c) => c[2]), 1);
+  const total = heat.cells.reduce((s, c) => s + c[2], 0) || 1;
   const cw = (heat.x1 / heat.nx) * K;
   const ch = (heat.y1 / heat.ny) * K;
+  const { ref, on, tipEl } = useChartTip();
   return (
-    <svg viewBox={`${-0.7 * K} ${-0.7 * K} ${(W + 1.4) * K} ${(NET + 1.6) * K}`} className="w-full">
-      {/* near half drawn with net at TOP: mirror y so y=NET maps to top */}
-      <g transform={`translate(0 ${NET * K}) scale(1 -1)`}>
-        {heat.cells.map(([i, j, n]) => (
-          <rect
-            key={`${i}-${j}`}
-            x={i * cw} y={j * ch} width={cw + 0.5} height={ch + 0.5}
-            fill={color}
-            opacity={0.06 + 0.78 * Math.pow(n / max, 0.6)}
-          />
-        ))}
-        <g transform={`scale(1 -1) translate(0 ${-NET * K})`}>{/* lines drawn unmirrored */}</g>
-      </g>
-      <HalfLines />
-    </svg>
+    <div className="relative" ref={ref}>
+      <svg viewBox={`${-0.7 * K} ${-0.7 * K} ${(W + 1.4) * K} ${(NET + 1.6) * K}`} className="w-full">
+        {/* near half drawn with net at TOP: mirror y so y=NET maps to top */}
+        <g transform={`translate(0 ${NET * K}) scale(1 -1)`}>
+          {heat.cells.map(([i, j, n]) => (
+            <rect
+              key={`${i}-${j}`}
+              x={i * cw} y={j * ch} width={cw + 0.5} height={ch + 0.5}
+              fill={color}
+              opacity={0.06 + 0.78 * Math.pow(n / max, 0.6)}
+              {...on(
+                <span>
+                  <b className="mono">{((100 * n) / total).toFixed(1)}%</b> of tracked time here
+                </span>,
+              )}
+            />
+          ))}
+          <g transform={`scale(1 -1) translate(0 ${-NET * K})`}>{/* lines drawn unmirrored */}</g>
+        </g>
+        <HalfLines />
+      </svg>
+      {tipEl}
+    </div>
   );
 }
 
@@ -181,7 +201,7 @@ function HalfLines() {
       <line x1={(W / 2) * K} y1={0} x2={(W / 2) * K} y2={(NET - 1.98) * K} />
       <line
         x1={-0.2 * K} y1={0} x2={(W + 0.2) * K} y2={0}
-        stroke="rgba(233,242,236,0.8)" strokeWidth={sw * 1.4}
+        stroke="var(--court-net)" strokeWidth={sw * 1.4}
         strokeDasharray={`${0.12 * K} ${0.1 * K}`}
       />
       <text x={(W / 2) * K} y={-0.25 * K} textAnchor="middle" fontSize={10}
@@ -217,7 +237,7 @@ export function RallyMap({
             <polyline
               key={side}
               points={pts.map(([, x, y]) => `${x * K},${y * K}`).join(" ")}
-              fill="none" stroke={PHEX[p]} strokeWidth={1.3} opacity={0.35}
+              fill="none" stroke={PCOLOR[p]} strokeWidth={1.3} opacity={0.35}
             />
           );
         })}
@@ -227,7 +247,7 @@ export function RallyMap({
           <line
             key={`a${s.br}`}
             x1={s.hx * K} y1={s.hy! * K} x2={s.lx * K} y2={s.ly! * K}
-            stroke="rgba(233,242,236,0.4)" strokeWidth={1} strokeDasharray="3 3"
+            stroke="var(--arc)" strokeWidth={1} strokeDasharray="3 3"
           />
         ) : null,
       )}
@@ -235,8 +255,8 @@ export function RallyMap({
       {strokes.map((s) =>
         s.hx != null ? (
           <g key={`c${s.br}`} transform={`translate(${s.hx * K},${s.hy! * K})`}>
-            <circle r={7} fill={PHEX[s.p]} stroke="#06130c" strokeWidth={0.8} />
-            <text y={3} textAnchor="middle" fontSize={8} fontWeight={700} fill="#06130c">
+            <circle r={7} fill={PCOLOR[s.p]} stroke="var(--contact-ink)" strokeWidth={0.8} />
+            <text y={3} textAnchor="middle" fontSize={8} fontWeight={700} fill="var(--contact-ink)">
               {s.br}
             </text>
           </g>
@@ -246,7 +266,7 @@ export function RallyMap({
         <path
           d={star(10)}
           transform={`translate(${land.x * K},${land.y * K})`}
-          fill="var(--gold)" stroke="#06130c" strokeWidth={1}
+          fill="var(--gold)" stroke="var(--contact-ink)" strokeWidth={1}
         />
       )}
     </svg>
@@ -331,12 +351,12 @@ export function Replay2D({
             <g key={side}>
               <polyline
                 points={trail(side).map(([, x, y]) => `${x * K},${y * K}`).join(" ")}
-                fill="none" stroke={PHEX[p]} strokeWidth={2} opacity={0.4} strokeLinecap="round"
+                fill="none" stroke={PCOLOR[p]} strokeWidth={2} opacity={0.4} strokeLinecap="round"
               />
               {cur && (
                 <g transform={`translate(${cur[0] * K},${cur[1] * K})`}>
-                  <circle r={8} fill={PHEX[p]} stroke="#06130c" strokeWidth={1.2} />
-                  <text y={3.5} textAnchor="middle" fontSize={9} fontWeight={700} fill="#06130c">
+                  <circle r={8} fill={PCOLOR[p]} stroke="var(--contact-ink)" strokeWidth={1.2} />
+                  <text y={3.5} textAnchor="middle" fontSize={9} fontWeight={700} fill="var(--contact-ink)">
                     {p}
                   </text>
                 </g>
@@ -354,7 +374,7 @@ export function Replay2D({
               <circle
                 r={10 + age * 16}
                 fill="none"
-                stroke={ai ? "var(--ai)" : "rgba(233,242,236,0.9)"}
+                stroke={ai ? "var(--ai)" : "var(--hit-ring)"}
                 strokeWidth={2.2 * (1 - age)}
                 opacity={1 - age}
               />
@@ -372,7 +392,7 @@ export function Replay2D({
           <path
             d={star(10)}
             transform={`translate(${rep.land.x * K},${rep.land.y * K})`}
-            fill="var(--gold)" stroke="#06130c" strokeWidth={1}
+            fill="var(--gold)" stroke="var(--contact-ink)" strokeWidth={1}
           />
         )}
       </svg>

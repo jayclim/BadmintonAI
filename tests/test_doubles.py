@@ -18,7 +18,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from badminton.doubles import identity, insights, movement, roles, segment, sets, smooth  # noqa: E402
+from badminton import court  # noqa: E402
+from badminton.doubles import (  # noqa: E402
+    control, identity, insights, movement, roles, segment, sets, smooth)
 from badminton.doubles.track import REID_RADIUS_M, SlotAssigner, _Det  # noqa: E402
 
 _DUMMY = np.zeros((17, 2)), np.zeros(17), np.zeros(4)  # kxy, kcf, box stand-ins
@@ -386,6 +388,24 @@ def test_points_build_maps_rows_to_teams_and_detects_winner():
     # flipping top_team swaps the rows: now bottom row is team A
     flipped = points.build(rally_scores, rsides, fps=30.0, top_team="B")
     assert flipped["sets"][0]["final"] == {"a": 1, "b": 3} and flipped["sets"][0]["winner"] == "B"
+
+
+def test_control_symmetric_is_half():
+    """Mirror-image positions about the net → ~50/50 court control."""
+    gx, gy = control._grid()
+    L = court.COURT_LENGTH_M
+    pos = {"near": (2.0, 5.0), "near2": (4.0, 5.0),
+           "far": (2.0, L - 5.0), "far2": (4.0, L - 5.0)}
+    assert abs(control.near_control_mask(pos, gx, gy).mean() - 0.5) < 0.03
+
+
+def test_control_attacking_team_exceeds_half():
+    """Near pair up at the net, far pair pinned deep → near controls > half the court."""
+    gx, gy = control._grid()
+    L = court.COURT_LENGTH_M
+    pos = {"near": (2.5, 6.4), "near2": (3.5, 5.8),
+           "far": (2.5, L - 0.9), "far2": (3.5, L - 0.9)}
+    assert control.near_control_mask(pos, gx, gy).mean() > 0.55
 
 
 def _run() -> int:

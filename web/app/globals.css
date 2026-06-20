@@ -1,10 +1,14 @@
 @import "tailwindcss";
 
 /* ── COURTSIDE tokens — quiet instrument-panel minimalism ─────────────────
-   One dark neutral surface, hairline rules, mono microtype for data.
-   Color is reserved for meaning: player A orange, player B teal,
-   optic yellow = the AI layer, green/red = won/lost. Nothing decorative. */
-:root {
+   Two themes on one token set. NIGHT (default): one dark neutral surface,
+   hairline rules, mono microtype for data. SHIRO (白): warm washi-paper
+   white, sumi ink, persimmon vs deep-teal players, matcha for the AI layer.
+   Color is reserved for meaning: player A, player B, the AI layer,
+   green/red = won/lost. Nothing decorative. */
+:root,
+[data-theme="night"] {
+  color-scheme: dark;
   --bg: #0f1110;
   --panel: #131614;
   --panel-solid: #161a18;
@@ -23,6 +27,64 @@
   --err: #ff6257;
   --warn: #f5b43c;
   --gold: #ffd43b;
+  --sel: rgba(212, 245, 60, 0.22);
+  /* court rendering */
+  --court-fill: rgba(36, 84, 62, 0.30);
+  --court-line: rgba(208, 235, 216, 0.55);
+  --court-line-soft: rgba(208, 235, 216, 0.22);
+  --court-net: rgba(233, 242, 236, 0.8);
+  --court-dot: rgba(216, 231, 215, 0.4);
+  --arc: rgba(233, 242, 236, 0.4);
+  --contact-ink: #06130c; /* outline + numeral on player contact dots */
+  --hit-ring: rgba(233, 242, 236, 0.9);
+  /* charts */
+  --worm-line: rgba(233, 242, 236, 0.5);
+  --trace-x: #74c0fc;
+  --trace-y: #ffa94d;
+  --ref-tick: rgba(176, 200, 186, 0.5);
+  --seg-out: #b9846a;     /* point sources: opponent out / net / other */
+  --seg-net: #8a6a5c;
+  --seg-other: #5d7069;
+}
+
+[data-theme="shiro"] {
+  color-scheme: light;
+  --bg: #f6f3ec;          /* warm washi */
+  --panel: #fcfbf7;
+  --panel-solid: #ffffff;
+  --line: rgba(31, 38, 31, 0.14);
+  --line-soft: rgba(31, 38, 31, 0.07);
+  --ink: #1f261f;         /* sumi */
+  --mut: #5f6b60;
+  --dim: #95a094;
+  --pa: #c84b1b;          /* player A — shu vermillion / persimmon */
+  --pb: #0e7f72;          /* player B — deep ai-iro teal */
+  --pa-soft: rgba(200, 75, 27, 0.09);
+  --pb-soft: rgba(14, 127, 114, 0.09);
+  --ai: #6f8a00;          /* matcha — the AI layer on paper */
+  --ai-soft: rgba(111, 138, 0, 0.10);
+  --win: #2e8a52;
+  --err: #c92f2f;
+  --warn: #a87514;
+  --gold: #b8922a;
+  --sel: rgba(111, 138, 0, 0.16);
+  /* court rendering — ink lines on paper, a whisper of moss */
+  --court-fill: rgba(63, 110, 78, 0.08);
+  --court-line: rgba(31, 38, 31, 0.42);
+  --court-line-soft: rgba(31, 38, 31, 0.16);
+  --court-net: rgba(31, 38, 31, 0.55);
+  --court-dot: rgba(31, 38, 31, 0.20);
+  --arc: rgba(31, 38, 31, 0.28);
+  --contact-ink: #fdfcf7;
+  --hit-ring: rgba(31, 38, 31, 0.7);
+  /* charts */
+  --worm-line: rgba(31, 38, 31, 0.38);
+  --trace-x: #1b6ec2;
+  --trace-y: #c2410c;
+  --ref-tick: rgba(31, 38, 31, 0.25);
+  --seg-out: #b07a52;
+  --seg-net: #8a6450;
+  --seg-other: #87928a;
 }
 
 @theme inline {
@@ -49,6 +111,7 @@ body {
   font-size: 15px;
   letter-spacing: 0.005em;
   min-height: 100vh;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 main { position: relative; z-index: 1; }
@@ -106,7 +169,18 @@ h1, h2, h3, .disp {
 @keyframes pop { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
 .worm-dot { animation: pop 0.25s ease-out both; transform-box: fill-box; transform-origin: center; }
 
-::selection { background: rgba(212, 245, 60, 0.22); }
+::selection { background: var(--sel); }
+
+/* shiro panels sit on the paper with a faint lift */
+[data-theme="shiro"] .card {
+  box-shadow: 0 1px 2px rgba(31, 38, 31, 0.03), 0 16px 32px -28px rgba(31, 38, 31, 0.3);
+}
+
+/* theme toggle labels are CSS-swapped so the markup never depends on the
+   theme — no hydration mismatch, correct on first paint */
+.shiro-only { display: none; }
+[data-theme="shiro"] .shiro-only { display: inline; }
+[data-theme="shiro"] .night-only { display: none; }
 
 * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 

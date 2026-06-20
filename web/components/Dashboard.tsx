@@ -12,6 +12,7 @@ import CourtView from "@/components/views/CourtView";
 import Patterns from "@/components/views/Patterns";
 import Film from "@/components/views/Film";
 import Lab from "@/components/views/Lab";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const TABS: [string, string][] = [
   ["overview", "Overview"],
@@ -115,6 +116,7 @@ export default function Dashboard({ id, src, view }: { id: string; src: Source; 
             })}
           </div>
         )}
+        <ThemeToggle />
       </nav>
 
       {src === "ai" && (

@@ -8,7 +8,7 @@ import { Replay2D, RallyMap } from "@/components/court";
 import RallyVideo from "@/components/RallyVideo";
 import { useReplay } from "@/lib/data";
 import type { Rally } from "@/lib/types";
-import { PCOLOR, PHEX, ytLink } from "@/lib/fmt";
+import { PCOLOR, ytLink } from "@/lib/fmt";
 
 export default function Film({ d, id, src }: ViewProps) {
   const { meta, rallies, strokes } = d;
@@ -104,7 +104,7 @@ export default function Film({ d, id, src }: ViewProps) {
         {/* rally list */}
         <Card className="rise-1 !p-0 overflow-hidden min-w-0">
           <div className="px-4 py-2.5 border-b border-[var(--line-soft)] kicker">
-            {filtered.length} RALLIES — SCORE IS A–B AFTER THE RALLY · ❄ CLUTCH
+            {filtered.length} RALLIES — SCORE IS A–B AFTER THE RALLY · ◆ CLUTCH
           </div>
           <div className="max-h-[520px] overflow-y-auto">
             {filtered.map((r) => {
@@ -118,7 +118,7 @@ export default function Film({ d, id, src }: ViewProps) {
                 >
                   <span className="mono text-[13px] font-semibold">
                     {r.a}–{r.b}
-                    {r.clutch && <span className="text-[10px]"> ❄</span>}
+                    {r.clutch && <span className="text-[10px]"> ◆</span>}
                   </span>
                   <span className="text-[12.5px] truncate">
                     {r.winner ? (
@@ -183,8 +183,10 @@ export default function Film({ d, id, src }: ViewProps) {
                       key={s.br}
                       className="shrink-0 w-[74px] rounded border px-1.5 pt-1 pb-1.5 text-center"
                       style={{
-                        borderColor: isEnd ? PHEX[s.p] : "var(--line)",
-                        background: isEnd ? `${PHEX[s.p]}18` : "transparent",
+                        borderColor: isEnd ? PCOLOR[s.p] : "var(--line)",
+                        background: isEnd
+                          ? `color-mix(in srgb, ${PCOLOR[s.p]} 10%, transparent)`
+                          : "transparent",
                       }}
                       title={`#${s.br} ${names[s.p]} — ${s.shot}${press ? ` · reached at ${press} m/s` : ""}`}
                     >
@@ -198,7 +200,7 @@ export default function Film({ d, id, src }: ViewProps) {
                           }}
                         />
                       </div>
-                      <div className="mono text-[10px] font-semibold" style={{ color: PHEX[s.p] }}>
+                      <div className="mono text-[10px] font-semibold" style={{ color: PCOLOR[s.p] }}>
                         {s.br}
                       </div>
                       <div className="text-[9.5px] text-mut leading-tight truncate">{s.shot}</div>

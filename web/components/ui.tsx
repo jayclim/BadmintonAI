@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { P } from "@/lib/types";
 import { PCOLOR } from "@/lib/fmt";
 
@@ -170,14 +170,24 @@ export function WatchBtn({ n, onClick }: { n: number; onClick: () => void }) {
 }
 
 /** simple absolute tooltip container — parent must be position:relative */
-export function Tip({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+export function Tip({
+  x,
+  y,
+  below = false,
+  children,
+}: {
+  x: number;
+  y: number;
+  below?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div
       className="absolute z-30 pointer-events-none card !rounded-md px-3 py-2 text-[12px] leading-snug shadow-xl"
       style={{
         left: x,
         top: y,
-        transform: "translate(-50%, calc(-100% - 10px))",
+        transform: below ? "translate(-50%, 14px)" : "translate(-50%, calc(-100% - 10px))",
         background: "var(--panel-solid)",
         minWidth: 150,
       }}
@@ -185,4 +195,29 @@ export function Tip({ x, y, children }: { x: number; y: number; children: ReactN
       {children}
     </div>
   );
+}
+
+/** cursor-following tooltip for charts. Put `ref` on a position:relative wrapper,
+    spread `on(content)` onto each hoverable element, render `tipEl` last. */
+export function useChartTip() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; node: ReactNode } | null>(null);
+  const show = (node: ReactNode) => (e: MouseEvent) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = Math.min(Math.max(e.clientX - r.left, 78), Math.max(r.width - 78, 78));
+    setTip({ x, y: e.clientY - r.top, node });
+  };
+  const hide = () => setTip(null);
+  const on = (node: ReactNode) => ({
+    onMouseEnter: show(node),
+    onMouseMove: show(node),
+    onMouseLeave: hide,
+  });
+  const tipEl = tip ? (
+    <Tip x={tip.x} y={tip.y} below={tip.y < 64}>
+      {tip.node}
+    </Tip>
+  ) : null;
+  return { ref, on, tipEl };
 }

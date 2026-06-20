@@ -1,0 +1,34 @@
+# Keep the build context small and large/host-specific artifacts out of the image.
+# (Most of these aren't COPYed anyway, but excluding them speeds the context upload.)
+
+# Python env / caches
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Data: videos + DuckDB are huge and host-specific — mount at runtime instead
+data/
+*.mp4
+*.duckdb
+*.duckdb.wal
+
+# Model weights: YOLO auto-downloads; TrackNetV3/BST ckpts are fetched separately
+*.pt
+*.npz
+third_party/*/ckpts/
+
+# Web app: built/installed separately, not part of the Python image
+web/node_modules/
+web/.next/
+web/out/
+
+# VCS / OS / editor
+.git/
+.gitignore
+.DS_Store
+*.log
+
+# Docs/media not needed at runtime
+docs/img/

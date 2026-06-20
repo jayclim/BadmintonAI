@@ -1,7 +1,7 @@
 import type { P } from "./types";
 
+/* player colors always go through CSS vars so both themes resolve them */
 export const PCOLOR: Record<P, string> = { A: "var(--pa)", B: "var(--pb)" };
-export const PHEX: Record<P, string> = { A: "#ff8a4a", B: "#2fd6c8" };
 
 export const other = (p: P): P => (p === "A" ? "B" : "A");
 

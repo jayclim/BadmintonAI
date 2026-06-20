@@ -32,8 +32,8 @@ export default function Points({ d, goFilm }: ViewProps) {
       <section>
         <Section
           kicker="RALLY-ENDERS BY SHOT"
-          title="Weapons vs leaks"
-          hint="Green = outright winners hit with that shot; red = points thrown away with it. The biggest red bar is the cheapest place to improve. Click a bar to watch those rallies."
+          title="Winners vs errors"
+          hint="Green = winners hit with that shot; red = errors made with it. The biggest red bar is the cheapest place to improve. Hover for counts; click a bar to watch those rallies."
         />
         <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
           {(["B", "A"] as P[]).map((p, i) => {
@@ -50,7 +50,7 @@ export default function Points({ d, goFilm }: ViewProps) {
                   </span>
                   {leak && leak.e >= 4 && (
                     <span className="mono text-[10px] px-1.5 py-0.5 rounded border border-[var(--err)]/40 text-err ml-auto">
-                      ⚠ LEAK: {leak.shot.toUpperCase()} ({leak.e})
+                      ⚠ MOST ERRORS: {leak.shot.toUpperCase()} ({leak.e})
                     </span>
                   )}
                 </div>
@@ -75,14 +75,14 @@ export default function Points({ d, goFilm }: ViewProps) {
       <section className="grid lg:grid-cols-5 gap-4 [&>*]:min-w-0">
         <Card className="lg:col-span-3">
           <Section
-            kicker="PATIENCE VS FIRST STRIKE"
+            kicker="RALLY LENGTH"
             title="Who wins the long rallies?"
-            hint="Win rate by rally length. A big gap is a game plan: shorten or extend points on purpose."
+            hint="Win rate by rally length. A big gap suggests shortening or extending rallies on purpose."
           />
           <LengthCols rows={insights.lengthBuckets} names={names} />
         </Card>
         <Card className="lg:col-span-2">
-          <Section kicker="POINT SOURCES" title="How each player's points came" />
+          <Section kicker="POINT SOURCES" title="Where the points came from" />
           <div className="space-y-5">
             {(["B", "A"] as P[]).map((p) => (
               <div key={p}>
@@ -92,9 +92,9 @@ export default function Points({ d, goFilm }: ViewProps) {
                 <StackedShare
                   parts={[
                     { label: "own winners", value: pw[p].winners, color: "var(--win)" },
-                    { label: "opponent out", value: pw[p].opp_out, color: "#b9846a" },
-                    { label: "opponent net", value: pw[p].opp_net, color: "#8a6a5c" },
-                    { label: "other", value: pw[p].opp_other, color: "#5d7069" },
+                    { label: "opponent out", value: pw[p].opp_out, color: "var(--seg-out)" },
+                    { label: "opponent net", value: pw[p].opp_net, color: "var(--seg-net)" },
+                    { label: "other", value: pw[p].opp_other, color: "var(--seg-other)" },
                   ]}
                 />
               </div>
@@ -151,7 +151,7 @@ export default function Points({ d, goFilm }: ViewProps) {
 
         <Card delay={3}>
           <Section
-            kicker="FROM 18-ALL TERRITORY"
+            kicker="LATE IN EACH SET"
             title="Clutch points"
             hint="Points decided once either player reached 18."
           />

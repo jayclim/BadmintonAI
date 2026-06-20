@@ -26,8 +26,19 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="night"
+      suppressHydrationWarning
       className={`${archivo.variable} ${plexMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* apply the saved theme before first paint (see Next.js
+            "preventing flash before hydration" guide) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("cs-theme");if(t==="shiro"||t==="night")document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

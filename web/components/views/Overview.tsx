@@ -19,9 +19,9 @@ export default function Overview({ d, src, goFilm, goRally }: ViewProps) {
       {/* score worm */}
       <section>
         <Section
-          kicker="THE MATCH IN ONE PICTURE"
+          kicker="SCORE FLOW"
           title="Who led, point by point"
-          hint="Step line = the point lead. ◆ = clutch points (either player at 18+). Hover any point for the story; click to watch the rally."
+          hint="Step line = the point lead. ◆ = clutch points (either player at 18+). Hover a point for details; click to watch the rally."
         />
         <div className="grid lg:grid-cols-2 gap-4">
           {sets.map((sn, i) => (
@@ -73,9 +73,9 @@ export default function Overview({ d, src, goFilm, goRally }: ViewProps) {
       {/* coach's notes */}
       <section>
         <Section
-          kicker="AUTO-READ FROM THE DATA"
+          kicker="FROM THE DATA"
           title="Coach's notes"
-          hint="Rule-based findings ranked by how much they mattered. Every card links to the exact rallies behind it."
+          hint="Rule-based findings ranked by how much they mattered. Each card links to the rallies behind it."
         >
           {src === "ai" && <AiTag text="AI-DERIVED" />}
         </Section>
@@ -137,10 +137,10 @@ export default function Overview({ d, src, goFilm, goRally }: ViewProps) {
                     {rep.name}
                   </div>
                   <p className="text-[13.5px] text-mut leading-relaxed mb-3"><Md>{rep.overview}</Md></p>
-                  <NoteList title="🗡 STRENGTHS" items={rep.strengths} />
-                  <NoteList title="⚠ WEAKNESSES" items={rep.weaknesses} />
-                  <NoteList title="🏋 TRAIN NEXT" items={rep.training_priorities} />
-                  <div className="kicker mt-3 mb-1">HOW TO BEAT HIM</div>
+                  <NoteList title="STRENGTHS" items={rep.strengths} />
+                  <NoteList title="WEAKNESSES" items={rep.weaknesses} />
+                  <NoteList title="TRAIN NEXT" items={rep.training_priorities} />
+                  <div className="kicker mt-3 mb-1">GAME PLAN AGAINST</div>
                   <p className="text-[13.5px] text-ink/85 leading-relaxed"><Md>{rep.gameplan_against}</Md></p>
                 </Card>
               );

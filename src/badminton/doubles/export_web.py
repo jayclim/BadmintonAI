@@ -36,7 +36,7 @@ import pandas as pd
 
 from .. import config, court, db
 from . import identity as _identity
-from . import insights, movement, points, roles, segment, sets, validate
+from . import control, insights, movement, points, roles, segment, sets, validate
 
 OUT_DEFAULT = config.REPO_ROOT / "web" / "public" / "data"
 DOUBLES_INDEX = "doubles_index.json"
@@ -342,6 +342,43 @@ def _flow_table(match_id: str, fps: float, rsides: list[dict],
     return {"A": teams["A"], "B": teams["B"], "rallies": out_rallies}
 
 
+# ------------------------------------------------------------------ court control
+
+def _control_table(match_id: str, windows, rsides: list[dict], teams: dict) -> dict:
+    """Per-TEAM court control (Voronoi dominant region), attributed via the per-rally
+    side→team map. Reports the bias-cancelled index (raw control has a static far-side
+    floor — see control.py) plus a set-1 control MAP (near=A) as the 'control surface'."""
+    frac, _, _, _ = control.control_series(match_id, windows=windows)
+    base = control.match_baseline(frac)                # near% baseline (static bias floor)
+    rallies, accum = [], {"A": [], "B": []}
+    for i, (a, b) in enumerate(windows, 1):
+        vals = [v for f, v in frac.items() if a <= f <= b]
+        if not vals:
+            continue
+        near = 100 * float(np.mean(vals))
+        rsi = rsides[i - 1]
+        accum[rsi["nearPair"]].append((near, len(vals)))
+        accum[rsi["farPair"]].append((100 - near, len(vals)))
+        rallies.append({"rally": i, "set": rsi["set"], "f0": int(a), "f1": int(b),
+                        "nearPair": rsi["nearPair"], "farPair": rsi["farPair"],
+                        "nearControlPct": round(near), "nearIndex": round(near - base, 1)})
+    summary = {}
+    for t in ("A", "B"):
+        s = accum[t]
+        fr = sum(n for _, n in s)
+        summary[t] = round(sum(c * n for c, n in s) / fr, 1) if fr else None
+
+    cmap = None
+    set1 = [w for w, rs in zip(windows, rsides) if rs["set"] == 1]
+    if set1:
+        _, grid, n1, _ = control.control_series(match_id, windows=set1)
+        if n1:
+            cmap = {"step": control.GRID_STEP, "w": court.COURT_WIDTH_M, "l": court.COURT_LENGTH_M,
+                    "nearTeam": teams["A"], "farTeam": teams["B"],
+                    "grid": [[round(float(v), 3) for v in row] for row in grid]}
+    return {"baseline": round(base, 1), "summary": summary, "rallies": rallies, "map": cmap}
+
+
 # ------------------------------------------------------------------ per-rally replay
 
 def _export_replay(match_id: str, rally_no: int, a: int, b: int, fps: float,
@@ -460,6 +497,7 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
     players = _player_table(match_id, windows, rsides)
     movements = _movement_table(match_id, fps, teams, rally_full)
     flow = _flow_table(match_id, fps, rsides, max_gap, min_len)
+    control_tbl = _control_table(match_id, windows, rsides, teams)
     showcase = validate.showcase(match_id, fps, max_gap, min_len, None)
     notes = _coach_notes(teams, formation, flow, players)
     # Points / momentum from the scoreboard scores (rows are fixed by team; top_team anchors it)
@@ -485,7 +523,8 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
     _write(out / match_id / "doubles.json",
            dict(meta=meta, rallies=rally_rows, formation=formation,
                 formationBySet=formation_by_set, players=players,
-                movement=movements, flow=flow, points=pts, showcase=showcase, notes=notes))
+                movement=movements, flow=flow, control=control_tbl, points=pts,
+                showcase=showcase, notes=notes))
 
     rd = roles.roles_df(match_id)
     for i, (a, b) in enumerate(windows, 1):

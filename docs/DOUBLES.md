@@ -238,6 +238,22 @@ table, which doubles has no rows in.)
 To refresh after re-tracking: `py scripts/render_doubles_clips.py --match <id>` then
 `py -m badminton.doubles.export_web <id>` then `cd web && npm run build`.
 
+## AI commentary (`doubles/commentary.py`)
+
+LLM doubles-coach report, mirroring the singles `commentary.py` but isolated (re-implements
+the provider/.env plumbing locally; no import of the singles module). Source of truth is the
+exported `doubles.json` — condensed to a compact dossier (heatmaps and replay grids dropped),
+sent to the model, validated into a `DoublesCommentary` (headline, match story, turning points,
+per-pair strengths / weaknesses / training / gameplan).
+
+- Providers: `gemini` (GEMINI_API_KEY) and `claude` (ANTHROPIC_API_KEY, `claude-opus-4-8`,
+  `messages.parse` + adaptive thinking); default is gemini when both keys are in the repo-root `.env`.
+- `py -m badminton.doubles.commentary <id>` caches `data/commentary/<id>.doubles.<provider>.json`
+  and publishes `web/public/data/<id>/analysis.json`.
+- Web: `useDoublesAnalysis` loads `analysis.json`; the Overview shows an **AI ANALYSIS** section
+  at the top (renders nothing if it hasn't been generated).
+- Full flow: `export_web <id>` → `commentary <id>` → `cd web && npm run build`.
+
 ## Not done yet (deferred Phase 1+)
 
 These are intentionally *not* built, to keep the singles chain untouched until Phase 0

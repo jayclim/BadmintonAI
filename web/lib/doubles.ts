@@ -207,6 +207,37 @@ export interface CoachNote {
   body: string;
 }
 
+/** court-control (Voronoi dominant region). Raw full-court control carries a static
+    far-side bias (far court-y reads ~1.4 m toward the net — see control.py), so the
+    tactical read is `nearIndex` = nearControlPct − baseline (deviation cancels the bias). */
+export interface ControlRally {
+  rally: number;
+  set: number;
+  f0: number;
+  f1: number;
+  nearPair: Team;
+  farPair: Team;
+  nearControlPct: number;
+  nearIndex: number;
+}
+
+export interface ControlMap {
+  step: number;
+  w: number;
+  l: number;
+  nearTeam: string;
+  farTeam: string;
+  /** [ny][nx]: fraction of set-1 frames the near (team A) side held each court cell */
+  grid: number[][];
+}
+
+export interface DoublesControl {
+  baseline: number; // near% static-bias floor
+  summary: Record<Team, number | null>; // frame-weighted control % per team
+  rallies: ControlRally[];
+  map: ControlMap | null; // set-1 control surface (near = team A)
+}
+
 export interface DoublesMatch {
   meta: DoublesMeta;
   rallies: DoublesRally[];
@@ -215,6 +246,7 @@ export interface DoublesMatch {
   players: PlayerShare[];
   movement: PlayerMovement[];
   flow: DoublesFlow;
+  control: DoublesControl | null;
   points: DoublesPoints | null;
   showcase: DoublesShowcase | null;
   notes: CoachNote[];
@@ -304,3 +336,30 @@ export const useDoublesMatch = (id: string) => useJson<DoublesMatch>(`/data/${id
 
 export const useDoublesReplay = (id: string, rally: number | null) =>
   useJson<DoublesReplay>(rally != null ? `/data/${id}/dreplay/r${rally}.json` : null);
+
+/** AI tactical commentary (optional — present only after `doubles.commentary` has run).
+    Snake_case mirrors the pydantic `DoublesCommentary` dump written to analysis.json. */
+export interface AnalysisPair {
+  pair: string;
+  overview: string;
+  strengths: string[];
+  weaknesses: string[];
+  training_priorities: string[];
+  gameplan_against: string;
+}
+
+export interface DoublesAnalysis {
+  provider: string;
+  model: string;
+  generated_at: string;
+  commentary: {
+    headline: string;
+    match_story: string;
+    turning_points: string[];
+    pairs: AnalysisPair[];
+  };
+}
+
+/** Returns null when no analysis.json exists for the match (a 404 leaves data null). */
+export const useDoublesAnalysis = (id: string) =>
+  useJson<DoublesAnalysis>(`/data/${id}/analysis.json`);
