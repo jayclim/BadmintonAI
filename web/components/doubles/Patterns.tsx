@@ -6,7 +6,7 @@
    defence trace for both pairs. All from the geometric roles layer — no strokes. */
 
 import type { DoublesViewProps } from "@/components/DoublesDashboard";
-import type { FlowSide, Team } from "@/lib/doubles";
+import type { FlowSide, ShotCount, ShotResponse, Team } from "@/lib/doubles";
 import { TEAM_COLOR, TEAMS } from "@/lib/doubles";
 import { Card, Section, Metric, WatchBtn } from "@/components/ui";
 import { FormationTimeline } from "@/components/doubles/court4";
@@ -64,8 +64,66 @@ function SideCard({ team, f, pair }: { team: Team; f: FlowSide; pair: string }) 
   );
 }
 
+function TeamHead({ team, pair }: { team: Team; pair: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <div className="font-semibold text-[1.05rem]" style={{ color: TEAM_COLOR[team] }}>{pair}</div>
+      <span className="mono text-[10px] tracking-[0.16em] text-dim">TEAM {team}</span>
+    </div>
+  );
+}
+
+function ShotMixCard({ team, pair, mix }: { team: Team; pair: string; mix: ShotCount[] }) {
+  const color = TEAM_COLOR[team];
+  const max = mix.length ? mix[0].pct : 1;
+  return (
+    <Card>
+      <TeamHead team={team} pair={pair} />
+      <div className="mt-3 space-y-1.5">
+        {mix.map((s) => (
+          <div key={s.shot} className="flex items-center gap-2">
+            <span className="w-24 shrink-0 text-[12px] text-mut truncate" title={s.shot}>{s.shot}</span>
+            <div className="flex-1 h-3 rounded-full bg-[var(--line-soft)] overflow-hidden">
+              <div className="h-full" style={{ width: `${(s.pct / max) * 100}%`, background: color }} />
+            </div>
+            <span className="mono text-[11px] text-dim w-9 text-right">{s.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ResponseCard({ team, pair, responses }: { team: Team; pair: string; responses: ShotResponse[] }) {
+  return (
+    <Card>
+      <TeamHead team={team} pair={pair} />
+      <div className="mt-2 divide-y divide-[var(--line-soft)]">
+        {responses.slice(0, 6).map((r) => (
+          <div key={r.vs} className="py-2 flex items-center gap-3">
+            <span className="w-24 shrink-0 text-[12px] text-mut truncate" title={`vs ${r.vs}`}>
+              vs {r.vs}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {r.answers.slice(0, 3).map((a) => (
+                <span
+                  key={a.shot}
+                  className="text-[11px] px-1.5 py-0.5 rounded mono"
+                  style={{ background: "var(--panel-solid)", color: "var(--ink)" }}
+                >
+                  {a.shot} <span className="text-dim">{a.pct}%</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export default function DoublesPatterns({ d, goRally }: DoublesViewProps) {
-  const { flow, meta } = d;
+  const { flow, meta, shots } = d;
   const multiSet = meta.nSets > 1;
 
   if (!flow || flow.rallies.length === 0) {
@@ -78,6 +136,36 @@ export default function DoublesPatterns({ d, goRally }: DoublesViewProps) {
 
   return (
     <div className="space-y-8 mt-2">
+      {shots && (
+        <>
+          <section>
+            <Section
+              kicker="SHOT SELECTION"
+              title="What each pair hits"
+              hint="Shot mix per pair from CV-detected contacts (img-y extrema on the tracked shuttle), kept per fixed team across the end-swaps. Shot TYPES are a geometry baseline transferred from the labelled singles matches — unvalidated on doubles (no doubles labels exist), so read the distribution, not any single call."
+            />
+            <div className="grid md:grid-cols-2 gap-5">
+              {TEAMS.map((t) => (
+                <ShotMixCard key={t} team={t} pair={meta.teams[t]} mix={shots.mix[t]} />
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <Section
+              kicker="RESPONSE MATRIX"
+              title="How each pair answers"
+              hint="Given the opponent's last shot (left), the shots this pair replies with most. The doubles read: who blocks vs counter-drives a smash, who lifts vs spins back at the net."
+            />
+            <div className="grid md:grid-cols-2 gap-5">
+              {TEAMS.map((t) => (
+                <ResponseCard key={t} team={t} pair={meta.teams[t]} responses={shots.responses[t]} />
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
       <section>
         <Section
           kicker="FORMATION FLOW"

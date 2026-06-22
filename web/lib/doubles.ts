@@ -238,6 +238,22 @@ export interface DoublesControl {
   map: ControlMap | null; // set-1 control surface (near = team A)
 }
 
+/** stroke-derived shot tactics (null until doubles.strokes has been written + re-exported) */
+export interface ShotCount {
+  shot: string; // display name (lift/serve/push/block renames already applied)
+  n: number;
+  pct: number;
+}
+export interface ShotResponse {
+  vs: string; // opponent's shot
+  total: number;
+  answers: ShotCount[]; // how this team answers it, most common first
+}
+export interface DoublesShots {
+  mix: Record<Team, ShotCount[]>;
+  responses: Record<Team, ShotResponse[]>;
+}
+
 export interface DoublesMatch {
   meta: DoublesMeta;
   rallies: DoublesRally[];
@@ -250,6 +266,7 @@ export interface DoublesMatch {
   points: DoublesPoints | null;
   showcase: DoublesShowcase | null;
   notes: CoachNote[];
+  shots: DoublesShots | null;
 }
 
 /** Display label for a per-player movement entry: the roster athlete name where known

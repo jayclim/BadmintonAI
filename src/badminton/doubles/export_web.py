@@ -36,7 +36,7 @@ import pandas as pd
 
 from .. import config, court, db
 from . import identity as _identity
-from . import control, insights, movement, points, roles, segment, sets, validate
+from . import control, insights, movement, points, roles, segment, sets, shots, validate
 
 OUT_DEFAULT = config.REPO_ROOT / "web" / "public" / "data"
 DOUBLES_INDEX = "doubles_index.json"
@@ -471,6 +471,30 @@ def _coach_notes(teams: dict, formation: dict, flow: dict, players: list) -> lis
 
 # ------------------------------------------------------------------ per-match
 
+def _shots_table(match_id: str) -> dict | None:
+    """Stroke-derived shot mix + response matrix per team A/B. The shot DISPLAY renames
+    (lift/serve/push/block) are applied HERE — the presentation boundary — off the
+    singles SHOT_DISPLAY map; the DB/strokes keep canonical strings. None pre-strokes."""
+    from ..insights import SHOT_DISPLAY
+    ts = shots.team_strokes(match_id)
+    if ts.empty:
+        return None
+    disp = lambda s: SHOT_DISPLAY.get(s, s)
+
+    def rows(counter):
+        tot = sum(counter.values()) or 1
+        return [{"shot": disp(k), "n": int(v), "pct": round(100 * v / tot)}
+                for k, v in counter.most_common()]
+
+    mix = {t: rows(c) for t, c in shots.shot_mix(match_id, ts).items()}
+    responses = {}
+    for team, mat in shots.response_matrix(match_id, ts).items():
+        responses[team] = [
+            {"vs": disp(opp), "total": int(sum(ans.values())), "answers": rows(ans)}
+            for opp, ans in sorted(mat.items(), key=lambda kv: -sum(kv[1].values()))]
+    return {"mix": mix, "responses": responses}
+
+
 def export_match(match_id: str, out: Path, set_no: int = 1,
                  max_gap: int = 20, min_len: int = 45) -> dict | None:
     m = config.get_match(match_id)
@@ -524,7 +548,7 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
            dict(meta=meta, rallies=rally_rows, formation=formation,
                 formationBySet=formation_by_set, players=players,
                 movement=movements, flow=flow, control=control_tbl, points=pts,
-                showcase=showcase, notes=notes))
+                showcase=showcase, notes=notes, shots=_shots_table(match_id)))
 
     rd = roles.roles_df(match_id)
     for i, (a, b) in enumerate(windows, 1):
