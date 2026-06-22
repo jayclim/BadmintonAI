@@ -3,7 +3,6 @@ yt-dlp
 opencv-python
 numpy
 duckdb
-polars
 pyyaml
 
 # Detection/pose (heavy; installs torch + MPS)
