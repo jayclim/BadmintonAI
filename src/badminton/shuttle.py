@@ -47,7 +47,22 @@ def _patch_torch():
         return _load(*a, **k)
 
     torch.load = load
-    return dev
+
+    # Force num_workers=0 on every DataLoader. predict.py sets num_workers=batch_size, and on
+    # macOS DataLoader workers SPAWN — each pickles a full copy of the in-RAM frame_arr (~4GB at
+    # 720p), so 8 workers = ~32GB+ → 70GB swap → OOM. In-process loading copies nothing; the MPS
+    # forward is the bottleneck anyway. ponytail: blunt override, the only knob that caps the fan-out.
+    import torch.utils.data as _tud
+    _DataLoader = _tud.DataLoader
+
+    def _dl(*a, **k):
+        k["num_workers"] = 0
+        k.pop("persistent_workers", None)
+        k.pop("prefetch_factor", None)
+        return _DataLoader(*a, **k)
+
+    _tud.DataLoader = _dl                 # predict.py's `from torch.utils.data import DataLoader`
+    return dev                            # runs after this patch, so it binds our wrapper
 
 
 def run_tracknet(video_file: Path, save_dir: Path, eval_mode: str = "weight",
@@ -152,6 +167,66 @@ def track_video(match_id: str, clip: Path | None = None, frame_offset: int = 0,
     return n
 
 
+def _chunk_ranges(f0: int, f1: int, chunk: int) -> list[tuple[int, int]]:
+    """[(c0, c1), ...] inclusive sub-windows tiling [f0, f1]. Pure (resume/logging math)."""
+    return [(c0, min(c0 + chunk - 1, f1)) for c0 in range(f0, f1 + 1, chunk)]
+
+
+def _free_mps() -> None:
+    try:
+        import torch
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+    except Exception:
+        pass
+
+
+def _covered(match_id: str, c0: int, c1: int) -> int:
+    con = db.connect(read_only=True)
+    try:
+        return con.execute("SELECT COUNT(*) FROM shuttle WHERE match_id=? AND frame_num "
+                           "BETWEEN ? AND ?", [match_id, c0, c1]).fetchone()[0]
+    finally:
+        con.close()
+
+
+def track_window(match_id: str, f0: int, f1: int, chunk: int = 1500,
+                 resume: bool = False, eval_mode: str = "weight") -> int:
+    """Chunked shuttle tracking over [f0, f1]: each chunk is cut → predicted → imported →
+    its clip deleted, so progress is checkpointed (commit per chunk) and logged. With
+    resume, chunks already present in the shuttle table are skipped. Mirrors
+    scripts/parse_match.py's resumable chunk loop.
+
+    ponytail: a chunk is atomic enough — import (DELETE+INSERT) runs in seconds at the
+    chunk's end, the kill risk is the multi-minute predict, so a re-run just redoes the
+    not-yet-imported chunk. Don't wrap it in an explicit transaction."""
+    import time
+    chunks = _chunk_ranges(f0, f1, chunk)
+    span, total, t0 = f1 - f0 + 1, 0, time.time()
+    print(f"[shuttle] {match_id}: {len(chunks)} chunks over frames {f0}-{f1} "
+          f"(chunk={chunk}, resume={resume})", flush=True)
+    for i, (c0, c1) in enumerate(chunks, 1):
+        if resume and _covered(match_id, c0, c1) > 0:
+            print(f"[shuttle] [{i}/{len(chunks)}] skip {c0}-{c1} (already tracked)", flush=True)
+            continue
+        clip = cut_exact(match_id, c0, c1)
+        # large_video=False (non-streaming): the streaming reader crashes at clip boundaries
+        # (upstream dataset.py frame_list[-1] on empty). Memory is bounded by keeping --chunk
+        # small: a 720p frame is ~2.76MB, so 1500 frames ~= 4GB. ponytail: shrink --chunk if OOM.
+        out_csv = run_tracknet(clip, PRED_DIR / match_id, eval_mode=eval_mode, large_video=False)
+        n = import_csv(match_id, out_csv, frame_offset=c0, replace_window=(c0, c1))
+        clip.unlink(missing_ok=True)        # chunk mp4 imported; don't hoard disk
+        _free_mps()                          # release MPS cache between chunks (OOM insurance)
+        total += n
+        done = c1 - f0 + 1
+        el = (time.time() - t0) / 60
+        eta = el / done * (span - done) if done else 0
+        print(f"[shuttle] [{i}/{len(chunks)}] {c0}-{c1} -> {n:,} frames | "
+              f"{100 * done / span:.0f}% | elapsed {el:.1f}m | ETA {eta:.0f}m", flush=True)
+    print(f"[shuttle] DONE {match_id}: {total:,} frames imported this run", flush=True)
+    return total
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="TrackNetV3 shuttle tracking → DuckDB")
     ap.add_argument("match_id")
@@ -160,15 +235,23 @@ if __name__ == "__main__":
     ap.add_argument("--start-frame", type=int, default=0,
                     help="full-video frame number of the clip's first frame")
     ap.add_argument("--window", type=int, nargs=2, metavar=("F0", "F1"), default=None,
-                    help="track exact video frames [F0, F1] (frame-accurate cv2 cut)")
+                    help="track exact video frames [F0, F1] (chunked, resumable)")
+    ap.add_argument("--chunk", type=int, default=1500,
+                    help="frames per checkpointed chunk (~2.76MB/frame at 720p; keep RAM-safe)")
+    ap.add_argument("--resume", action="store_true", help="skip chunks already in the table")
     ap.add_argument("--eval-mode", default="weight",
                     choices=["nonoverlap", "average", "weight"],
                     help="temporal ensemble mode (nonoverlap = 8x faster, less accurate)")
     args = ap.parse_args()
-    if args.window:
-        f0, f1 = args.window
-        tmp = cut_exact(args.match_id, f0, f1)
-        track_video(args.match_id, clip=tmp, frame_offset=f0, eval_mode=args.eval_mode)
-    else:
+    if args.clip:                            # single small clip — no chunking needed
         track_video(args.match_id, clip=args.clip, frame_offset=args.start_frame,
                     eval_mode=args.eval_mode)
+    else:
+        if args.window:
+            f0, f1 = args.window
+        else:                                # full match: frame range from the video
+            import cv2
+            cap = cv2.VideoCapture(str(config.REPO_ROOT / config.get_match(args.match_id)["video_path"]))
+            f0, f1 = 0, int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
+            cap.release()
+        track_window(args.match_id, f0, f1, args.chunk, args.resume, args.eval_mode)
