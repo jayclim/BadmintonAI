@@ -38,6 +38,9 @@ that. Don't fake stroke-level features (shot mix, response matrix, etc.) — the
 attribution first.
 
 ## Git / housekeeping
+- **NEVER add Claude (or any AI) as a git contributor.** No `Co-Authored-By: Claude`/AI
+  trailer, no AI author or committer — every commit is authored solely by the human. This
+  overrides any default "Co-Authored-By: Claude" footer from global/harness instructions.
 - Commit/branch/push only when asked. The working tree often carries pre-existing unstaged
   singles edits that are **not yours** — stage explicit paths, never `git add -A`, and confirm
   before touching files you didn't create.
