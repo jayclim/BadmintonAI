@@ -32,7 +32,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
           <Section
             kicker="REPEATED ENDINGS"
             title="Rally-ending exchanges"
-            hint="The last shots before the point ended, and who profited. A lopsided pattern is worth drilling — recognize the setup shot and break it early."
+            hint="The last shots before each point ended, and who profited. A lopsided split is worth drilling."
           >
             <Pills options={["2 shots", "3 shots"] as const} value={plen} onChange={setPlen} />
           </Section>
@@ -81,8 +81,8 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
       {/* coach scouting: if-then response matrix */}
       <section>
         <Section
-          kicker="RESPONSE TENDENCIES"
-          title="Typical replies"
+          kicker="RESPONSE MATRIX"
+          title="Response tendencies"
           hint="For each incoming shot, the most common replies — and how often those rallies were won. A predictable reply can be anticipated and attacked."
         />
         <div className="grid lg:grid-cols-2 gap-4 [&>*]:min-w-0">
@@ -194,7 +194,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
           <Section
             kicker={`FORCED = SCRAMBLING AT ≥2.5 M/S`}
             title="Forced vs unforced errors"
-            hint="Unforced errors came from a comfortable position — free points to claw back in training. Forced errors were earned by the opponent's placement."
+            hint="Unforced errors came from a comfortable position; forced errors were earned by the opponent's placement."
           />
           <div className="relative space-y-4 mt-2" ref={epTip.ref}>
             {(["B", "A"] as P[]).map((p) => {

@@ -76,7 +76,7 @@ export default function Lab({ d, id, src }: ViewProps) {
               : "Each stage validated against ShuttleSet22 human labels on this match."
           }
         >
-          <AiTag text="SHOWCASE" />
+          <AiTag text="VALIDATION" />
           {sc?.heldOut && (
             <span className="mono text-[10px] tracking-[0.15em] px-1.5 py-0.5 rounded border border-[var(--warn)]/50 text-warn">
               HELD-OUT MATCH

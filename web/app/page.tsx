@@ -39,8 +39,8 @@ export default function Home() {
           COURT<span style={{ color: "var(--ai)" }}>SIDE</span>
         </h1>
         <p className="text-mut max-w-2xl mt-4 text-[15px] leading-relaxed">
-          A complete scouting report from nothing but broadcast video. Computer vision tracks
-          both players and the shuttle, detects every hit, classifies every shot, reads the
+          A complete scouting report from broadcast video alone. Computer vision tracks both
+          players and the shuttle, detects every hit, classifies every shot, and reads the
           scoreboard — then writes the coach&apos;s notes. Flip any match to{" "}
           <span style={{ color: "var(--ai)" }} className="font-semibold">
             AI VISION
@@ -114,11 +114,11 @@ export default function Home() {
             </span>
           </div>
           <p className="text-mut text-[14px] max-w-2xl mb-6 leading-relaxed">
-            Four players, identical kit, constant occlusion — so we track{" "}
+            Four players in identical kit, frequently occluded — so we track{" "}
             <span style={{ color: "var(--ai)" }} className="font-semibold">
               roles
             </span>{" "}
-            instead of names: front/back, attack vs defence formation, and who hunts the net.
+            rather than names: front and back, attacking vs defending formation, and net coverage.
           </p>
           <div className="grid md:grid-cols-2 gap-5">
             {dbl.matches.map((m, i) => (

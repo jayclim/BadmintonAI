@@ -9,12 +9,11 @@ truth, including on a fully held-out match.
 
 ![COURTSIDE overview — label-free AI mode](docs/img/web_overview.jpg)
 
-> The banner is the point: everything on that page — the score worm, the stats, the
-> coach's notes — was inferred from pixels. Flip the same dashboard to **GROUND TRUTH**
-> (human labels) and compare; the gap between the two toggles is measured and published
-> on the AI Lab page.
+> Everything on that page — the score worm, the stats, the coach's notes — was inferred
+> from pixels. Flip the same dashboard to **GROUND TRUTH** (human labels) to compare; the
+> gap between the two is measured and published on the AI Lab page.
 
-## The pipeline, with honest numbers
+## Pipeline accuracy
 
 Thresholds were tuned on one match (India Open 2022 final) and tested untouched on a
 second (Denmark Open 2022 SF) — the held-out column is true out-of-distribution
@@ -43,7 +42,7 @@ library; deploys to Vercel as pure static files):
 
 - **Overview** — interactive score worm, stat duel, auto-generated *coach's notes* where
   every claim deep-links to its evidence rallies, plus an LLM-written match report.
-- **Points / Court / Patterns** — weapons-vs-leaks, rally-length win rates, serve & receive,
+- **Points / Court / Patterns** — winners and errors by shot, rally-length win rates, serve & receive,
   shot placement maps, movement heatmaps (side-swap corrected), pressure model
   (required movement speed), forced/unforced errors, and two scouting tables:
   the **response matrix** ("vs a net shot he lifts 52% — and wins only 41% of those")
@@ -53,7 +52,7 @@ library; deploys to Vercel as pure static files):
 - **AI overlay everywhere** — a persistent navbar toggle swaps all footage to
   pre-rendered annotated clips: pose skeletons, shuttle trail, BST shot calls with
   confidence, and the machine-read score, baked into the video.
-- **AI Lab** — the showcase page: each pipeline stage with its measured accuracy, a rally
+- **AI Lab** — each pipeline stage with its measured accuracy, a rally
   "X-ray" (broadcast + 2D replay + raw shuttle trajectory with detected vs labeled hits),
   live score-OCR crops, and the BST-vs-labels confusion matrix.
 
@@ -63,12 +62,12 @@ library; deploys to Vercel as pure static files):
 ## Doubles
 
 Doubles is a separate, deletable surface (route `/d/<id>`, its own manifest and
-components) so the proven singles chain stays untouched. There are no public doubles stroke
+components) so the singles chain stays untouched. There are no public doubles stroke
 labels and identical kit defeats appearance re-ID, so the doubles pipeline leans on
 **geometry and roles** instead of strokes: it tracks all four players (top-2 per court half,
 stable identity slots), then derives — purely from the tracks — **formation** (attack =
 front/back stack vs defence = side-by-side), **rotations**, per-player **net-hunting**,
-**movement** heatmaps, and a **label-free validation** showcase (≈93% all-4 in-rally
+**movement** heatmaps, and **label-free validation** (≈93% all-4 in-rally
 coverage, identity stability, OCR parity). Five COURTSIDE views: Overview (+ rule-based
 scouting notes), Court, Patterns (formation flow), Film room (4-player 2D replay), AI Lab.
 
@@ -134,7 +133,7 @@ broadcast.mp4 ──► YOLO11 pose + ByteTrack ──► tracks (court metres, 
                          export_web.py ──► static JSON ──► web/ (Next.js)
 ```
 
-The design bet that paid off: **ShuttleSet's annotation format is the system's Tier-1
+The core design decision: **ShuttleSet's annotation format is the system's Tier-1
 schema.** The CV pipeline's job is defined as *reproducing the human annotators' table* —
 which gives free per-stage validation, and means the entire analytics layer was built and
 debugged on ground truth before the vision pipeline existed.
@@ -147,6 +146,32 @@ debugged on ground truth before the vision pipeline existed.
 - **Video strategy** — analyzed videos are the official BWF YouTube uploads, so the web app
   embeds them at frame-accurate timestamps (zero hosting); the AI-annotated clips are
   rendered locally at 540p (~0.7 MB/rally) and shipped with the site.
+
+## Credits / Prior Work
+
+COURTSIDE builds on four pretrained third-party models, used **without fine-tuning**:
+[Ultralytics YOLO11-Pose](https://github.com/ultralytics/ultralytics) (player pose),
+[ByteTrack](https://arxiv.org/abs/2110.06864) (identity, via Ultralytics' bundled tracker),
+[TrackNetV3](https://github.com/qaz812345/TrackNetV3) (shuttle trajectory — vendored and run
+unmodified), and [BST-0](https://arxiv.org/abs/2502.21085) (*Badminton Stroke-type
+Transformer*, Chang, CVPRW 2026). Ground truth and the Tier-1 data schema come from the
+[ShuttleSet / ShuttleSet22](https://github.com/wywyWang/CoachAI-Projects) human annotations.
+The runtime stack is PyTorch (Apple-silicon MPS), OpenCV, DuckDB, pandas, and scikit-learn,
+with a static Next.js 16 / Tailwind front end (charts are hand-built SVG, no charting library).
+
+Everything connecting those models is original work: the hit-detection, landing-estimation,
+rally-segmentation, score-OCR, side-mapping, analytics, and dashboard stages, plus the
+homography calibration, foot-point heuristic, MPS shims for the vendored models, the BST input
+adapter, and the validation harness that scores each stage against ShuttleSet. Reported
+accuracies split accordingly — player tracking (0.57 m) is third-party detection through my
+court mapping; shot classification (72–83%) is BST-0's accuracy on my pipeline's inputs; hit
+detection (F1 87.9), landings (0.55 m), rally segmentation (F1 97.6), and score OCR (95.2%)
+are produced by original code.
+
+**Licenses:** YOLO11/Ultralytics is **AGPL-3.0** (weights are gitignored, auto-downloaded — not
+redistributed here); TrackNetV3 and BST are MIT (vendored with their LICENSE files). See
+[`LICENSES/README.md`](LICENSES/README.md) before redistributing or deploying the pipeline as a
+network service.
 
 ## Docs
 

@@ -74,7 +74,7 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
           title="Validated without a single label"
           hint="No public doubles dataset exists and the one SOTA paper hand-annotated just two matches — so this pipeline trains on nothing. Every stage is checked on its own terms: tracking coverage, identity stability and rally segmentation, all measured straight from the tracks."
         >
-          <AiTag text="SHOWCASE" />
+          <AiTag text="VALIDATION" />
           <span className="mono text-[10px] tracking-[0.15em] px-1.5 py-0.5 rounded border border-[var(--ai)]/40 text-[var(--ai)]">
             ZERO LABELS
           </span>

@@ -15,9 +15,9 @@ Doubles is hard for reasons the singles pipeline never hit (see research notes i
 project memory): partners wear identical kit so appearance re-ID is useless, and the
 four players occlude and cross constantly, causing identity switches. There is also **no
 public doubles stroke dataset** — ShuttleSet is singles-only — so we generate strokes
-with our own monocular chain rather than training on labels. The bet is that *roles*
+with our own monocular chain rather than training on labels. The premise is that *roles*
 (front/back, formation) are both more robust and more tactically meaningful than
-persistent player identity, so we lean on geometry, not names.
+persistent player identity, so we rely on geometry, not names.
 
 ## What Phase 0 ships
 
@@ -219,7 +219,7 @@ table, which doubles has no rows in.)
   `web/components/DoublesDashboard.tsx` (six tabs + the shared **AI-overlay navbar toggle**,
   `useOverlayPref`), and **six** views in `web/components/doubles/`:
   **Overview** (AI scouting-notes strip + attack/defence split, rotations, front-swaps,
-  median gaps, "who hunts the net", rally log), **Points** (`Points.tsx`: per-set score worm +
+  median gaps, "who plays the net", rally log), **Points** (`Points.tsx`: per-set score worm +
   sets-won + longest momentum run + short/mid/long win splits, from the scoreboard OCR), **Court**
   (`Movement.tsx`: **per-PLAYER** heatmaps — 4 cards, one per person, with a set selector —
   distance/speed/coverage + NET/MID/REAR occupancy, reusing `court.tsx::HeatMap`), **Patterns**

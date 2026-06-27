@@ -143,7 +143,7 @@ function ControlSection({ d, goRally }: { d: DoublesMatch; goRally: (rally: numb
       <Section
         kicker="COURT CONTROL"
         title="Who owns the court"
-        hint="Voronoi dominant region — each court point belongs to the team whose nearer player is closer; >50% means a pair commands more than its own half (the spatial signature of attacking). A small static far-side bias sits under the raw share, so the most one-sided rallies are ranked by deviation from the match baseline."
+        hint="Voronoi dominant region — each court point belongs to the team whose nearer player is closer; >50% means a pair commands more than its own half (a sign of attacking). A small static far-side bias sits under the raw share, so the most one-sided rallies are ranked by deviation from the match baseline."
       />
       <div className="grid md:grid-cols-2 gap-5">
         <Card>
@@ -263,7 +263,7 @@ export default function DoublesOverview({ d, goRally }: DoublesViewProps) {
           kicker="FORMATION"
           title="Attack vs defence"
           hint={
-            "Attack = the pair stacked front-to-back (one hunts the net, partner covers the rear). Defence = side-by-side, receiving a smash. Rotations count debounced flips between the two." +
+            "Attack = the pair stacked front-to-back (one at the net, partner covering the rear). Defence = side-by-side, receiving a smash. Rotations count debounced flips between the two." +
             (multiSet ? " Aggregated across all sets — pairs swap ends each game, so stats follow the team, not the court side." : "")
           }
         />
@@ -278,7 +278,7 @@ export default function DoublesOverview({ d, goRally }: DoublesViewProps) {
         <section>
           <Section
             kicker="ROLES"
-            title="Who hunts the net"
+            title="Who plays the net"
             hint={`Share of in-rally frames each player spent as the front (net) player of their pair${multiSet ? " — computed for the roster-named set(s)" : ""}. The net player attacks; their partner covers the rear.`}
           />
           <div className="grid md:grid-cols-2 gap-5">

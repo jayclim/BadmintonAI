@@ -2,7 +2,7 @@
 
 Static Next.js dashboard for the badminton CV project. Replaces the Streamlit app for
 presentation: coach analytics (overview, points, court maps, patterns, film room) plus
-an **AI Lab** that shows every CV pipeline stage working, with honest validation numbers.
+an **AI Lab** that shows every CV pipeline stage working, with measured validation numbers.
 Each match renders from two data sources — **GROUND TRUTH** (ShuttleSet labels) and
 **AI VISION** (the fully label-free chain) — switchable from the top bar.
 

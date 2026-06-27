@@ -183,7 +183,7 @@ export default function DoublesPatterns({ d, goRally }: DoublesViewProps) {
         <Section
           kicker="RALLY BY RALLY"
           title="Attack ⇄ defence trace"
-          hint="Each rally as two timelines — solid = that pair was attacking (front/back stack), faint = defending (side-by-side). When one fills solid while the other stays faint, that pair owned the rally. Click to watch."
+          hint="Each rally as two timelines — solid = that pair was attacking (front/back stack), faint = defending (side-by-side). When one fills solid while the other stays faint, that pair controlled the rally. Click to watch."
         />
         <Card className="!p-0 overflow-hidden">
           <div className="divide-y divide-[var(--line-soft)]">

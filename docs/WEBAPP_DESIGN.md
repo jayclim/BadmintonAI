@@ -8,7 +8,7 @@ Deploys to Vercel with zero config (pure static export — also hostable anywher
 
 | User | Job to be done | What must be obvious in <10 s |
 |---|---|---|
-| **Coach** | Prep a game plan against an opponent | His weapons, his leaks, the pattern to break, video proof |
+| **Coach** | Prep a game plan against an opponent | His strengths, his weaknesses, the pattern to break, video proof |
 | **Player** | Self-review after a match | Where my points went, what to drill next |
 | **Analyst / demo viewer** | See the AI work | Raw broadcast in → full scouting report out, no human labels |
 
@@ -18,7 +18,7 @@ Design consequences:
 - Two **data sources** per match where available: `labels` (ShuttleSet ground truth) and
   `ai` (the fully label-free CV chain). A global toggle swaps the ENTIRE dashboard between
   them — that toggle *is* the demo: same coach view, zero human input.
-- A dedicated **AI Lab** page shows each pipeline stage working visually, with honest
+- A dedicated **AI Lab** page shows each pipeline stage working visually, with measured
   validation numbers (incl. the held-out match).
 
 ## 2. Stack and why
@@ -92,9 +92,9 @@ was inferred from the broadcast video — no human labels".
    colored panels. Model + token caption.
 
 ### 4.2 Points (`/points`)
-1. **Weapons & leaks** — per player, diverging horizontal bars per shot type (winners →
-   right in green, errors → left in red), sorted by involvement; the biggest red bar is
-   the cheapest fix and gets a "⚠ leak" flag. Bar click → Film room (those enders).
+1. **Winners & errors by shot** — per player, diverging horizontal bars per shot type
+   (winners → right in green, errors → left in red), sorted by involvement; the biggest red
+   bar is the cheapest fix and gets a "⚠ most errors" flag. Bar click → Film room (those enders).
 2. **Where points came from** — per player 100% stacked bar: own winners / opponent out /
    opponent net / other.
 3. **Rally length win rates** — grouped columns (short ≤4 / mid 5–9 / long 10+) per
@@ -118,7 +118,7 @@ was inferred from the broadcast video — no human labels".
 1. **Ending sequences** — 2-shot/3-shot toggle; each row: pattern ("lift → smash"), count,
    a split bar of who profited (player colors), watch button. Lopsided (≥75%) rows flagged.
 2. **Forced vs unforced errors** — per player stacked bar (forced amber / unforced red)
-   with the ≥2.5 m/s definition stated; unforced-heavy gets "free points to claw back".
+   with the ≥2.5 m/s definition stated; unforced-heavy is flagged as the cheaper errors to fix.
 3. **Shot mix butterfly** — mirrored horizontal bars, A left / B right, % of own shots
    per type — rally construction styles at a glance.
 4. **Backhand vulnerability** (labels source only) — usage% vs error-share% dumbbell per
@@ -134,11 +134,11 @@ was inferred from the broadcast video — no human labels".
 4. **2D replay** — animated SVG court synced to a scrubber: player dots with motion
    trails (CV tracks), hit flashes labeled with the shot type (AI mode: + confidence),
    stroke arcs hitter → landing, final landing star. Play/pause/0.5–2× speed. This is
-   the per-rally AI showcase.
+   the per-rally AI view.
 5. **Shot-by-shot strip** — numbered chips (hitter-colored) with shot type and a
    pressure bar (required m/s) per stroke; the ender chip gets the outcome badge.
 
-### 4.6 AI Lab (`/lab`) — the showcase
+### 4.6 AI Lab (`/lab`)
 1. **Pipeline stepper** — VIDEO → POSE/TRACKS (0.566 m median) → SHUTTLE (TrackNetV3,
    99.8% of hit points) → HITS (F1 87.9) → SHOT CLASSES (BST-0 72–83%) → RALLIES
    (F1 94–98 label-free) → SCORE OCR (95–97% trajectory) → COACH VIEW. Each node is a
@@ -165,9 +165,9 @@ errorPressure, backhand, shotOutcomes, shotMix, pressureByShot, pressureSummary)
 report). `showcase.json`: tracking/hits/landing/segmentation/OCR validation numbers,
 labels-vs-AI agreement, BST confusion + recall, OCR events + crop manifest.
 
-## 6. Honest-numbers policy
+## 6. Reporting policy
 
-The Lab never rounds up: every metric states its evaluation basis (vs ShuttleSet labels,
+The Lab never inflates a result: every metric states its evaluation basis (vs ShuttleSet labels,
 ±6 frames, etc.) and shows the held-out match beside the tuned one. AI-mode coach pages
 carry the ribbon; categories the CV can't infer yet (backhand, exact lose reasons) say so
 instead of faking it.
