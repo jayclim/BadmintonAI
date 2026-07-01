@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import type { DoublesViewProps } from "@/components/DoublesDashboard";
 import type { DSide, Team } from "@/lib/doubles";
-import { TEAM_COLOR, useDoublesReplay } from "@/lib/doubles";
+import { SIDE_OF, TEAM_COLOR, useDoublesReplay } from "@/lib/doubles";
 import { DoublesReplay2D, DoublesVideo, FormationTimeline } from "@/components/doubles/court4";
 import { Card, Section } from "@/components/ui";
 import { fmtClock } from "@/lib/fmt";
@@ -106,6 +106,7 @@ export default function DoublesFilm({ d, id, goRally }: DoublesViewProps) {
                         f1={rep.f1}
                         color={TEAM_COLOR[team]}
                         marks
+                        ticks={rep.strokes?.filter((s) => SIDE_OF[s[1]] === side).map((s) => s[0])}
                       />
                     </div>
                   );
@@ -114,6 +115,32 @@ export default function DoublesFilm({ d, id, goRally }: DoublesViewProps) {
               <div className="text-[11px] text-dim mono mt-3">
                 filled = attack (front/back stack) · faint = defence (side-by-side) ·{" "}
                 <span style={{ color: "var(--ink)" }}>│</span> = rotation
+                {(rep.strokes?.length ?? 0) > 0 && " · ticks below = shuttle contacts"}
+              </div>
+            </Card>
+          )}
+
+          {rep && (rep.strokes?.length ?? 0) > 0 && (
+            <Card>
+              <div className="kicker mb-3">SHOT SEQUENCE · {rep.strokes!.length} CONTACTS</div>
+              <div className="flex flex-wrap gap-1.5">
+                {rep.strokes!.map(([, slot, shot], i) => {
+                  const team = teamOf(SIDE_OF[slot]);
+                  return (
+                    <span
+                      key={i}
+                      className="mono text-[11px] px-1.5 py-0.5 rounded border border-[var(--line)]"
+                      style={{ color: TEAM_COLOR[team] }}
+                      title={`contact ${i + 1} · ${meta.teams[team]}`}
+                    >
+                      {i + 1} {shot}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] text-dim mono mt-3">
+                CV contacts (shuttle img-y extrema) · shot types are a singles-trained geometry
+                baseline, unvalidated on doubles — read the rhythm, not single calls
               </div>
             </Card>
           )}

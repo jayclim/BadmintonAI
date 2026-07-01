@@ -51,9 +51,11 @@ def _load_dotenv() -> None:
 
 SYSTEM = """You are a world-class badminton doubles coach and analyst writing a post-match \
 tactical report on a professional doubles match. Your input is a statistical dossier \
-extracted from computer-vision player tracking (no shot-level labels exist for doubles, so \
-there are no stroke types or winners/errors — reason from positioning, formation and \
-movement, which is exactly what separates good doubles from bad).
+extracted from computer-vision player tracking and CV-detected shuttle contacts — no human \
+labels. Positioning, formation and movement are exact; shot TYPES (when a "shots" section \
+is present) come from a geometry classifier transferred from labelled singles and are \
+unvalidated on doubles — trust distributions and contrasts between the teams, never a \
+single call.
 
 How to read the dossier (doubles-specific):
 - Teams are A and B (fixed for the whole match); pairs swap ends between games, so every \
@@ -72,13 +74,18 @@ cancels because ends swap) and by the bias-cancelled per-rally "index", not raw 
 - "front_court_share" = % of in-rally frames each named player spent as the net player \
 (the attacker); the partner covers the rear.
 - "movement": per player distance / speed / court coverage and front/mid/back occupancy.
+- "shots" (when present): shot_mix = what each team hits; response_matrix = given the \
+opponent's shot (key), what the team answers with; serve_receive = points won serving vs \
+receiving (doubles' side-out stat; only OCR-scored rallies count); finishers = each scored \
+rally's LAST detected stroke — the winner's is the shot that finished the point, the \
+loser's is the shot that didn't come back (error and got-punished are indistinguishable).
 - "rule_based_flags" are deterministic observations already surfaced — build on them, \
 reconcile with the numbers, go deeper; don't just restate them.
 
 Write like a coach talking to coaches: concrete, evidence-cited (use the actual numbers), \
-doubles-specific (rotation, net dominance, attack/defence, who covers the rear), no fluff. \
-Every claim must be supported by a number in the dossier. Do not invent shot types, \
-specific rallies, or events that are not in the data."""
+doubles-specific (rotation, net dominance, attack/defence, serve pressure, who covers the \
+rear), no fluff. Every claim must be supported by a number in the dossier. Do not invent \
+specific rallies or events that are not in the data."""
 
 
 class PairReport(BaseModel):
@@ -139,6 +146,27 @@ def build_dossier(match_id: str) -> dict:
                            for s in pts.get("sets", [])],
                   "runs": pts.get("runs"), "lengthWins": pts.get("lengthWins")}
 
+    sh = d.get("shots") or {}
+    shots_block = None
+    if sh:
+        def mix(rows, n=6):
+            return {r["shot"]: f"{r['pct']}%" for r in (rows or [])[:n]}
+        shots_block = {
+            "note": "shot types are a singles-trained geometry baseline, unvalidated on "
+                    "doubles — read distributions, not single calls",
+            "shot_mix": {team_name(t): mix(sh["mix"].get(t)) for t in ("A", "B")},
+            "response_matrix": {team_name(t): {r["vs"]: mix(r["answers"], 3)
+                                               for r in (sh.get("responses", {}).get(t) or [])[:5]}
+                                for t in ("A", "B")},
+            "serve_receive": {team_name(t): sh["serveReceive"][t] for t in ("A", "B")}
+                             if sh.get("serveReceive") else None,
+            "finishers": {"point_winning_final_shots":
+                              {team_name(t): mix(sh["finishers"]["won"].get(t)) for t in ("A", "B")},
+                          "point_losing_final_shots":
+                              {team_name(t): mix(sh["finishers"]["lost"].get(t)) for t in ("A", "B")}}
+                         if sh.get("finishers") else None,
+        }
+
     return {
         "match": {"pairs": {k: team_name(k) for k in ("A", "B")},
                   "tournament": meta.get("tournament"), "round": meta.get("round"),
@@ -156,6 +184,7 @@ def build_dossier(match_id: str) -> dict:
                                "set": p["set"], "front_pct": p["frontPct"]}
                               for p in d.get("players", [])],
         "movement_from_cv": movement,
+        "shots": shots_block,
         "points": points,
         "rule_based_flags": [{"title": n["head"], "detail": n["body"]} for n in d.get("notes", [])],
     }

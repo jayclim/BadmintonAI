@@ -180,8 +180,10 @@ table, which doubles has no rows in.)
   `web/public/data/<id>/doubles.json` (meta + per-rally formation report w/ annotated-clip url +
   per-side match summary + per-player front-court share + **per-PLAYER movement** (4 per set) +
   formation `flow` + **`points`** (per-set score trajectory) + label-free `showcase` + rule-based
-  coach `notes`), per-rally 4-player replay tracks under `.../dreplay/r<n>.json`, and upserts
-  `doubles_index.json`. The per-rally scoreboard OCR runs ONCE and feeds both `sets` and `points`.
+  coach `notes` + stroke-derived `shots`: team mix, response matrix, **per-player mix** (keyed
+  (set, team, idx) like movement), **serve/receive point split** and **finishing shots** — the
+  last two join strokes to the OCR rally winners), per-rally 4-player replay tracks (now with the
+  per-rally **stroke sequence**) under `.../dreplay/r<n>.json`, and upserts `doubles_index.json`. The per-rally scoreboard OCR runs ONCE and feeds both `sets` and `points`.
   Re-implements export_web's tiny `_js`/`_write`/`_yt_id` helpers locally to keep the isolation
   rule (no import of the high-level singles `export_web`).
 - **Annotated clips (`doubles/render.py` + `scripts/render_doubles_clips.py`):** one MP4 per rally
@@ -271,10 +273,10 @@ tracking proves out on real footage:
   within-pair slots aren't re-anchored there. `identity.reanchor_at_serves` (score-parity) is the
   built hook to extend this — wiring it into the per-player export would name all sets. Only needed
   for per-athlete career stats; roles/team stats don't depend on it.
-- **Richer doubles tactics + web.** Six views are built (Overview + scouting notes, Points score
-  worm, Court per-player heatmaps, Patterns formation-flow, Film replay + annotated clips, AI Lab
-  validation showcase) — see "Web dashboard" above. Still open: **LLM coach notes** (the current
-  notes are rule-based; an `anthropic` generation step would add prose). A full per-pixel Voronoi
-  map was deliberately skipped — see Movement note above.
+- **Richer doubles tactics + web.** Six views are built (Overview + scouting notes + LLM
+  commentary, Points score worm + serve/receive + finishing shots, Court per-player heatmaps +
+  top shots, Patterns shot mix / response matrix / formation-flow, Film replay + shot sequence +
+  annotated clips, AI Lab validation showcase) — see "Web dashboard" above. A full per-pixel
+  Voronoi map was deliberately skipped — see Movement note above.
 - **Validation set.** Hand-annotate ~1–2 doubles matches to measure accuracy (mirrors
   the SOTA paper, which labeled exactly two).

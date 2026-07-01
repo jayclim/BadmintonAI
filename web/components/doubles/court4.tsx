@@ -294,19 +294,22 @@ function Controls({
 
 /** Horizontal attack/defence timeline for one side over a rally. With `marks`, each
     internal segment boundary (a debounced ROTATION event — attack⇄defence flip) is drawn
-    as a tick over the bar, so the rotation count is legible as discrete events. */
+    as a tick over the bar; `ticks` (frame numbers, e.g. this side's shuttle contacts)
+    are drawn as small ticks under it. */
 export function FormationTimeline({
   segs,
   f0,
   f1,
   color,
   marks = false,
+  ticks,
 }: {
   segs: [number, number, Formation][];
   f0: number;
   f1: number;
   color: string;
   marks?: boolean;
+  ticks?: number[];
 }) {
   const span = Math.max(1, f1 - f0);
   // internal boundaries = rotation events (start frame of every segment after the first)
@@ -339,6 +342,18 @@ export function FormationTimeline({
             }}
           />
         ))}
+      {ticks?.map((tf, i) => (
+        <div
+          key={`c${i}`}
+          title="shuttle contact"
+          className="absolute top-full h-1.5 w-px"
+          style={{
+            left: `${(100 * (tf - f0)) / span}%`,
+            background: color,
+            opacity: 0.8,
+          }}
+        />
+      ))}
     </div>
   );
 }

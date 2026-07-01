@@ -249,9 +249,36 @@ export interface ShotResponse {
   total: number;
   answers: ShotCount[]; // how this team answers it, most common first
 }
+/** per-player shot mix for one set — keyed (set, team, idx) exactly like PlayerMovement,
+    so the two join and share the name / P1-P2 labelling. Within-pair attribution is
+    nearest-partner (noisy); the side (= team) is exact. */
+export interface PlayerShots {
+  set: number;
+  team: Team;
+  idx: number;
+  name: string | null;
+  /** score-verified serves only (first stroke + the score says their team served);
+      null when no OCR score exists to verify against */
+  serves: number | null;
+  top: ShotCount[];
+}
+/** points won serving vs receiving (only rallies with an OCR-accepted winner count) */
+export interface ServeReceive {
+  servePlayed: number;
+  serveWon: number;
+  recvPlayed: number;
+  recvWon: number;
+}
 export interface DoublesShots {
   mix: Record<Team, ShotCount[]>;
   responses: Record<Team, ShotResponse[]>;
+  players: PlayerShots[];
+  serveReceive: Record<Team, ServeReceive> | null;
+  /** each scored rally's last stroke: hit by the winner = the finisher; by the loser =
+      the shot that didn't come back (error / got punished — CV can't split those) */
+  finishers: { won: Record<Team, ShotCount[]>; lost: Record<Team, ShotCount[]> } | null;
+  /** rally -> its final detected stroke (worm tooltip) */
+  rallyFinish: Record<string, { shot: string; team: Team }>;
 }
 
 export interface DoublesMatch {
@@ -291,6 +318,8 @@ export interface DoublesReplay {
   names: Record<DSlot, string> | null;
   tracks: Record<DSlot, [number, number, number][]>; // [frame, court x, court y]
   form: Record<DSide, FormSeg[]>;
+  /** CV-detected contacts in order: [frame, hitting slot, display shot name] */
+  strokes?: [number, DSlot, string][];
 }
 
 export const TEAMS: Team[] = ["A", "B"];

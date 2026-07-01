@@ -1,15 +1,14 @@
 "use client";
 
-/* Doubles "Points" — the score story. Singles' Points view is shot-based (winners/errors
-   per shot); doubles has no strokes, so this is the SCORE trajectory instead: a per-set
-   worm (which team led, by how much, point by point), the biggest momentum run, and
-   win-rate by rally length. Every number is derived from the per-rally scoreboard OCR +
-   the set/side structure — honest caveat shown, since the broadcast cuts away on the final
-   point and tracks-only segmentation slightly over-counts rallies. */
+/* Doubles "Points" — the score story: a per-set worm (which team led, by how much, point
+   by point), the biggest momentum run, win-rate by rally length, and — where CV strokes
+   exist — the serve/receive split and how points end. Scores come from the per-rally
+   scoreboard OCR + the set/side structure — honest caveat shown, since the broadcast cuts
+   away on the final point and tracks-only segmentation slightly over-counts rallies. */
 
 import { useMemo, useState } from "react";
 import type { DoublesViewProps } from "@/components/DoublesDashboard";
-import type { PointsSet, ScorePoint, Team } from "@/lib/doubles";
+import type { DoublesShots, PointsSet, ScorePoint, ServeReceive, ShotCount, Team } from "@/lib/doubles";
 import { TEAM_COLOR, TEAMS } from "@/lib/doubles";
 import { Card, Section, Metric } from "@/components/ui";
 
@@ -19,10 +18,12 @@ const shortPair = (name: string) => name.split(" / ").map((p) => p.split(" ")[0]
 function Worm({
   set,
   names,
+  finish,
   onPick,
 }: {
   set: PointsSet;
   names: Record<Team, string>;
+  finish?: DoublesShots["rallyFinish"];
   onPick: (rally: number) => void;
 }) {
   const W = 460, H = 220, padX = 46, padY = 24;
@@ -89,6 +90,12 @@ function Worm({
             <div>
               <span style={{ color: TEAM_COLOR[tip.p.winner] }}>{shortPair(names[tip.p.winner])}</span> won it
             </div>
+            {finish?.[String(tip.p.rally)] && (
+              <div className="text-dim">
+                final shot · {finish[String(tip.p.rally)].shot}
+                {finish[String(tip.p.rally)].team !== tip.p.winner && " (didn't come back)"}
+              </div>
+            )}
             <div className="text-dim mt-0.5">click to watch</div>
           </div>
         </div>
@@ -130,8 +137,79 @@ function LengthBars({ lengthWins, names }: {
   );
 }
 
+/** points won serving vs receiving, one row per team (doubles' side-out stat) */
+function ServeReceiveRows({ sr, names }: {
+  sr: Record<Team, ServeReceive>;
+  names: Record<Team, string>;
+}) {
+  const bar = (won: number, played: number, color: string) => (
+    <div>
+      <div className="h-3 rounded-full overflow-hidden bg-[var(--line-soft)]">
+        <div className="h-full" style={{ width: `${played ? (100 * won) / played : 0}%`, background: color }} />
+      </div>
+      <div className="mono text-[10.5px] text-dim mt-1">
+        {won}/{played} · {played ? Math.round((100 * won) / played) : 0}%
+      </div>
+    </div>
+  );
+  return (
+    <div className="space-y-4 mt-2">
+      {TEAMS.map((t) => (
+        <div key={t}>
+          <div className="mono text-[11px] mb-1.5" style={{ color: TEAM_COLOR[t] }}>
+            {shortPair(names[t])}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="mono text-[10px] text-dim mb-1">WON SERVING</div>
+              {bar(sr[t].serveWon, sr[t].servePlayed, TEAM_COLOR[t])}
+            </div>
+            <div>
+              <div className="mono text-[10px] text-dim mb-1">WON RECEIVING</div>
+              {bar(sr[t].recvWon, sr[t].recvPlayed, TEAM_COLOR[t])}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** how points end: the winner's finishing shots vs the loser's shot that didn't come back */
+function Finishers({ fin, names }: {
+  fin: { won: Record<Team, ShotCount[]>; lost: Record<Team, ShotCount[]> };
+  names: Record<Team, string>;
+}) {
+  const chips = (rows: ShotCount[], n: number) =>
+    rows.slice(0, n).map((s) => (
+      <span key={s.shot} className="text-[11px] px-1.5 py-0.5 rounded mono"
+        style={{ background: "var(--panel-solid)", color: "var(--ink)" }}>
+        {s.shot} <span className="text-dim">{s.n}</span>
+      </span>
+    ));
+  return (
+    <div className="space-y-4 mt-2">
+      {TEAMS.map((t) => (
+        <div key={t}>
+          <div className="mono text-[11px] mb-1.5" style={{ color: TEAM_COLOR[t] }}>
+            {shortPair(names[t])}
+          </div>
+          <div className="flex items-baseline gap-2 flex-wrap text-[11.5px]">
+            <span className="mono text-[10px] text-dim shrink-0 w-20">FINISH WITH</span>
+            {chips(fin.won[t], 3)}
+          </div>
+          <div className="flex items-baseline gap-2 flex-wrap text-[11.5px] mt-1.5">
+            <span className="mono text-[10px] text-dim shrink-0 w-20">LOSE ON</span>
+            {chips(fin.lost[t], 3)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DoublesPoints({ d, goRally }: DoublesViewProps) {
-  const { points: p, meta } = d;
+  const { points: p, meta, shots } = d;
 
   if (!p || p.sets.length === 0) {
     return (
@@ -165,7 +243,7 @@ export default function DoublesPoints({ d, goRally }: DoublesViewProps) {
                   </span>
                 )}
               </div>
-              <Worm set={s} names={meta.teams} onPick={goRally} />
+              <Worm set={s} names={meta.teams} finish={shots?.rallyFinish} onPick={goRally} />
             </Card>
           ))}
         </div>
@@ -210,6 +288,27 @@ export default function DoublesPoints({ d, goRally }: DoublesViewProps) {
           <LengthBars lengthWins={p.lengthWins} names={meta.teams} />
         </Card>
       </section>
+
+      {shots?.serveReceive && shots?.finishers && (
+        <section className="grid lg:grid-cols-2 gap-5 [&>*]:min-w-0">
+          <Card>
+            <Section
+              kicker="SERVE & RECEIVE"
+              title="Points won serving vs receiving"
+              hint="Doubles' side-out stat — the serving pair concedes the attack, so elite pairs win more receiving. The server comes from the score itself (the winner of a point serves the next); each game's first scored point has no predecessor and is skipped."
+            />
+            <ServeReceiveRows sr={shots.serveReceive} names={meta.teams} />
+          </Card>
+          <Card>
+            <Section
+              kicker="HOW POINTS END"
+              title="Finishing shots"
+              hint="Each scored rally's last CV-detected stroke. Hit by the winner = the shot that finished the point; hit by the loser = the shot that didn't come back (an error, or got punished — CV can't split those). Shot types are the unvalidated geometry baseline."
+            />
+            <Finishers fin={shots.finishers} names={meta.teams} />
+          </Card>
+        </section>
+      )}
 
       <p className="text-dim text-[12px] leading-snug max-w-3xl">
         Scores are read from the broadcast scoreboard graphic by OCR over the segmented

@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from "react";
 import type { DoublesViewProps } from "@/components/DoublesDashboard";
-import type { PlayerMovement, Team } from "@/lib/doubles";
+import type { PlayerMovement, PlayerShots, Team } from "@/lib/doubles";
 import { TEAM_COLOR, TEAMS, playerLabel } from "@/lib/doubles";
 import { Card, Section, Metric, Select } from "@/components/ui";
 import { HeatMap } from "@/components/court";
@@ -33,8 +33,8 @@ function ZoneBar({ mv, color }: { mv: PlayerMovement; color: string }) {
   );
 }
 
-function PlayerCard({ mv, label, color, delay }: {
-  mv: PlayerMovement; label: string; color: string; delay?: 1 | 2;
+function PlayerCard({ mv, label, color, shots, delay }: {
+  mv: PlayerMovement; label: string; color: string; shots?: PlayerShots; delay?: 1 | 2;
 }) {
   return (
     <Card delay={delay}>
@@ -50,18 +50,37 @@ function PlayerCard({ mv, label, color, delay }: {
         <Metric label="COVERAGE" value={mv.cov.toFixed(0)} sub="m² roamed" size="text-[1.3rem]" />
       </div>
       <ZoneBar mv={mv} color={color} />
+      {shots && shots.top.length > 0 && (
+        <div className="mt-3 pt-2.5 border-t border-[var(--line-soft)]">
+          <div className="mono text-[10px] text-dim mb-1.5">
+            TOP SHOTS{shots.serves != null && shots.serves > 0 ? ` · ${shots.serves} SERVES` : ""}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {shots.top.slice(0, 3).map((s) => (
+              <span key={s.shot} className="text-[11px] px-1.5 py-0.5 rounded mono"
+                style={{ background: "var(--panel-solid)", color: "var(--ink)" }}>
+                {s.shot} <span className="text-dim">{s.pct}%</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
 
 export default function DoublesMovement({ d }: DoublesViewProps) {
-  const { movement, meta } = d;
+  const { movement, meta, shots } = d;
 
   const sets = useMemo(
     () => Array.from(new Set(movement.map((m) => m.set))).sort((a, b) => a - b),
     [movement],
   );
   const [setSel, setSetSel] = useState<number>(sets[0] ?? 1);
+  const shotsBy = useMemo(
+    () => new Map((shots?.players ?? []).map((p) => [`${p.set}-${p.team}-${p.idx}`, p])),
+    [shots],
+  );
 
   if (!movement || movement.length === 0) {
     return (
@@ -82,7 +101,7 @@ export default function DoublesMovement({ d }: DoublesViewProps) {
           <Section
             kicker="FROM THE CV TRACKS — PER PLAYER, PER SET"
             title="Who covered what"
-            hint="Each player's court coverage over the set's rallies, plotted on one near half (net at the top, far side mirrored) so all four compare directly. NET / MID / REAR is where they lived; coverage is the area roamed."
+            hint="Each player's court coverage over the set's rallies, plotted on one near half (net at the top, far side mirrored) so all four compare directly. NET / MID / REAR is where they lived; coverage is the area roamed. TOP SHOTS attribute each CV contact to the nearer partner — the side is exact, the within-pair split approximate."
           />
           {sets.length > 1 && (
             <div className="w-32 shrink-0">
@@ -111,6 +130,7 @@ export default function DoublesMovement({ d }: DoublesViewProps) {
                 mv={mv}
                 label={playerLabel(mv, meta.teams)}
                 color={TEAM_COLOR[t]}
+                shots={shotsBy.get(`${mv.set}-${mv.team}-${mv.idx}`)}
                 delay={(ti + 1) as 1 | 2}
               />
             )),

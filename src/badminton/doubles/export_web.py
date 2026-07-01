@@ -2,9 +2,9 @@
 
 Mirrors the singles `badminton.export_web`, but for the doubles surface — which is a
 SEPARATE web route (`/d/<id>`) reading a SEPARATE manifest (`doubles_index.json`), so the
-singles dashboard is untouched and the whole doubles web surface stays deletable. Doubles
-has no strokes/shuttle yet, so there is nothing shot-level to emit; what we DO have is the
-tactical layer the singles schema can't express:
+singles dashboard is untouched and the whole doubles web surface stays deletable. Emits
+the tactical layer the singles schema can't express, plus (post `doubles.strokes`) the
+stroke-derived shot tables:
 
   - per-rally formation: attack (front/back stack) vs defence (side-by-side) share,
     rotations (attack<->defence flips) and front-player swaps, per side;
@@ -382,7 +382,8 @@ def _control_table(match_id: str, windows, rsides: list[dict], teams: dict) -> d
 # ------------------------------------------------------------------ per-rally replay
 
 def _export_replay(match_id: str, rally_no: int, a: int, b: int, fps: float,
-                   teams: dict, rsi: dict, rd: pd.DataFrame, out: Path) -> None:
+                   teams: dict, rsi: dict, rd: pd.DataFrame, out: Path,
+                   strokes: list | None = None) -> None:
     con = db.connect(read_only=True)
     rows = con.execute(
         "SELECT frame_num, player_id, court_x, court_y FROM tracks WHERE match_id=? "
@@ -402,7 +403,7 @@ def _export_replay(match_id: str, rally_no: int, a: int, b: int, fps: float,
     _write(out / match_id / "dreplay" / f"r{rally_no}.json", dict(
         fps=fps, f0=int(a), f1=int(b), rally=rally_no, set=rsi["set"],
         nearPair=rsi["nearPair"], farPair=rsi["farPair"],
-        pairs=pairs, names=None, tracks=tracks, form=form))
+        pairs=pairs, names=None, tracks=tracks, form=form, strokes=strokes or []))
 
 
 # ------------------------------------------------------------------ coach notes
@@ -471,10 +472,12 @@ def _coach_notes(teams: dict, formation: dict, flow: dict, players: list) -> lis
 
 # ------------------------------------------------------------------ per-match
 
-def _shots_table(match_id: str) -> dict | None:
-    """Stroke-derived shot mix + response matrix per team A/B. The shot DISPLAY renames
-    (lift/serve/push/block) are applied HERE — the presentation boundary — off the
-    singles SHOT_DISPLAY map; the DB/strokes keep canonical strings. None pre-strokes."""
+def _shots_table(match_id: str, pts: dict | None) -> dict | None:
+    """Stroke-derived shot tactics per team A/B: mix, response matrix, per-player mix,
+    serve/receive point splits and finishing shots (the last two join the strokes to the
+    OCR rally winners in `pts`). The shot DISPLAY renames (lift/serve/push/block) are
+    applied HERE — the presentation boundary — off the singles SHOT_DISPLAY map; the
+    DB/strokes keep canonical strings. None pre-strokes."""
     from ..insights import SHOT_DISPLAY
     ts = shots.team_strokes(match_id)
     if ts.empty:
@@ -492,7 +495,41 @@ def _shots_table(match_id: str) -> dict | None:
         responses[team] = [
             {"vs": disp(opp), "total": int(sum(ans.values())), "answers": rows(ans)}
             for opp, ans in sorted(mat.items(), key=lambda kv: -sum(kv[1].values()))]
-    return {"mix": mix, "responses": responses}
+
+    # server per rally comes from the SCORE (winner serves next), not the strokes —
+    # the contact detector can't see the far-side serve (window-edge extremum)
+    winners = {int(k): v for k, v in (pts or {}).get("rallyWinner", {}).items()}
+    srv = shots.rally_server((pts or {}).get("sets") or [])
+
+    # per player, keyed (set, team, idx) like movement — name only in the set-1 roster set
+    team_names = _identity.team_slot_names(match_id) or {}
+    players = [{"set": p["set"], "team": p["team"], "idx": p["idx"],
+                "name": team_names.get((p["team"], p["idx"])) if p["set"] == 1 else None,
+                "serves": p["serves"], "top": rows(p["shots"])}
+               for p in shots.player_mix(match_id, ts, srv)]
+
+    fin = shots.finishers(ts, winners)
+    return {"mix": mix, "responses": responses, "players": players,
+            "serveReceive": shots.serve_receive(winners, srv) if srv else None,
+            "finishers": {"won": {t: rows(c) for t, c in fin["won"].items()},
+                          "lost": {t: rows(c) for t, c in fin["lost"].items()}}
+                         if winners else None,
+            "rallyFinish": {str(r): {"shot": disp(v["shot"]), "team": v["team"]}
+                            for r, v in fin["rallyFinish"].items()}}
+
+
+def _rally_strokes(match_id: str) -> dict[int, list]:
+    """rally_id -> ordered [frame, slot, display shot] for the per-rally replay payloads."""
+    from ..insights import SHOT_DISPLAY
+    con = db.connect(read_only=True)
+    rows = con.execute(
+        "SELECT rally_id, frame_num, hitter, shot_type FROM strokes "
+        "WHERE match_id=? AND source='pipeline' ORDER BY frame_num", [match_id]).fetchall()
+    con.close()
+    out: dict[int, list] = {}
+    for rid, f, hitter, shot in rows:
+        out.setdefault(int(rid), []).append([int(f), hitter, SHOT_DISPLAY.get(shot, shot)])
+    return out
 
 
 def export_match(match_id: str, out: Path, set_no: int = 1,
@@ -548,11 +585,13 @@ def export_match(match_id: str, out: Path, set_no: int = 1,
            dict(meta=meta, rallies=rally_rows, formation=formation,
                 formationBySet=formation_by_set, players=players,
                 movement=movements, flow=flow, control=control_tbl, points=pts,
-                showcase=showcase, notes=notes, shots=_shots_table(match_id)))
+                showcase=showcase, notes=notes, shots=_shots_table(match_id, pts)))
 
     rd = roles.roles_df(match_id)
+    rally_strokes = _rally_strokes(match_id)
     for i, (a, b) in enumerate(windows, 1):
-        _export_replay(match_id, i, a, b, fps, teams, rsides[i - 1], rd, out)
+        _export_replay(match_id, i, a, b, fps, teams, rsides[i - 1], rd, out,
+                       rally_strokes.get(i))
 
     return dict(id=match_id, discipline="doubles",
                 pairs={"near": teams["A"], "far": teams["B"]},  # index keeps {near,far} shape
