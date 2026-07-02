@@ -134,9 +134,6 @@ wtf_2024_md_sf:
   - -0.00016610947288055416
   - 0.02712168961071101
   - 1.0
-  # Optional persistent-identity roster (see docs/DOUBLES.md). Per set: an anchor frame
-  # at the first serve + the 4 service-court quadrants -> player names. PLACEHOLDER names
-  # below (set by watching the anchor frame); demonstrates the schema a self-uploader fills.
   doubles_identity:
     1:
       anchor_frame: 27654
@@ -144,3 +141,38 @@ wtf_2024_md_sf:
       near_right: Nur Izzuddin
       far_left: Muhammad Rian Ardianto
       far_right: Fajar Alfian
+all_england_2022_ws_final:
+  match_id: all_england_2022_ws_final
+  discipline: singles
+  player_near: null
+  player_far: null
+  tournament: YONEX All England Open Badminton Championships 2022
+  round: Finals
+  match_date: '2022-03-20'
+  players:
+  - An Se Young
+  - Akane Yamaguchi
+  shuttleset_dir: Akane_YAMAGUCHI_AN_Seyoung_YONEX_All_England_Open_Badminton_Championships_2022_Finals
+  video_url: https://www.youtube.com/watch?v=bR80_ydY0Is
+  video_path: data/raw/all_england_2022_ws_final.mp4
+  fps: 30.0
+  court_corners_px:
+  - - 279.0
+    - 682.0
+  - - 1000.0
+    - 683.0
+  - - 915.0
+    - 366.0
+  - - 356.0
+    - 365.0
+  homography:
+  - 0.0163307367032859
+  - 0.003966772006791841
+  - -7.261614048848801
+  - 8.78108620101301e-05
+  - -0.06331163150930239
+  - 43.1540334588434
+  - -4.348647052806799e-06
+  - 0.0013693097100325902
+  - 1.0
+  ss_shuttle_offset: -1
