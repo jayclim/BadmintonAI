@@ -186,34 +186,48 @@ def rally_scores_ocr(match_id: str, windows, samples: int = 9, row_side=None):
     over `samples` frames per window (kills single-frame misreads). The re-anchor only
     uses score PARITY, so the OCR's one systematic confusion (8<->0, same parity) is
     harmless. `row_side` maps scoreboard rows to court sides (default top->near, bot->far;
-    a future match/set with ends swapped would flip this — derive from side_map/roster)."""
+    a future match/set with ends swapped would flip this — derive from side_map/roster).
+
+    Reads are cached on disk per window (data/cache/), saved as it goes — an interrupted
+    run resumes where it stopped, and a repeat run skips the cv2 seeks entirely."""
     import cv2
     from collections import Counter
 
     from .. import scoreboard as sb
+    from . import segment
     row_side = row_side or {"top": "near", "bot": "far"}
     box = sb.calibrate_box(match_id)
     if box is None:
         raise SystemExit("score box not found")
     tpl = sb._load_templates()
+    cache_name = f"doubles_scores_{match_id}.json"
+    cache = segment._disk_cache(cache_name)
     cap = cv2.VideoCapture(str(config.REPO_ROOT / config.get_match(match_id)["video_path"]))
-    out = []
-    for a, b in windows:
-        tops, bots = [], []
-        for f in np.linspace(a, b, samples).astype(int):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, int(f))
-            ok, fr = cap.read()
-            r = sb.read_frame(fr, box, tpl) if ok else None
-            if r:
-                tops.append(r["top"][-1])
-                bots.append(r["bot"][-1])
-        if not tops or not bots:
+    out, n_new = [], 0
+    for i, (a, b) in enumerate(windows, 1):
+        key = f"{a}-{b}"
+        if key not in cache:
+            n_new += 1
+            print(f"\r  score OCR {i}/{len(windows)} (cached {i - n_new})", end="", flush=True)
+            tops, bots = [], []
+            for f in np.linspace(a, b, samples).astype(int):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, int(f))
+                ok, fr = cap.read()
+                r = sb.read_frame(fr, box, tpl) if ok else None
+                if r:
+                    tops.append(r["top"][-1])
+                    bots.append(r["bot"][-1])
+            cache[key] = [Counter(tops).most_common(1)[0][0] if tops else None,
+                          Counter(bots).most_common(1)[0][0] if bots else None]
+            segment._disk_save(cache_name, cache)
+        top, bot = cache[key]
+        if top is None or bot is None:
             out.append((a, b, None, None))
             continue
-        top = Counter(tops).most_common(1)[0][0]
-        bot = Counter(bots).most_common(1)[0][0]
         out.append((a, b, top if row_side["top"] == "near" else bot,
                     bot if row_side["bot"] == "far" else top))
+    if n_new:
+        print()
     cap.release()
     return out
 

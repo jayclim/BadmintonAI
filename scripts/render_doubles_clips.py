@@ -59,6 +59,15 @@ def render_match(match_id: str, limit: int | None = None,
 
     out_dir = OUT / match_id
     out_dir.mkdir(parents=True, exist_ok=True)
+    # drop clips whose frame-window no longer matches any rally (stale after re-segmentation)
+    if not limit:
+        expected = {f"f{max(0, int(a) - PRE)}-{int(b) + POST}.mp4" for a, b in windows}
+        stale = [p for p in out_dir.glob("f*-*.mp4") if p.name not in expected]
+        for p in stale:
+            p.unlink()
+        if stale:
+            print(f"removed {len(stale)} stale clips (windows changed)")
+
     for i, (a, b) in enumerate(windows):
         f0, f1 = max(0, int(a) - PRE), int(b) + POST
         out = out_dir / f"f{f0}-{f1}.mp4"

@@ -51,7 +51,7 @@ export function DoublesVideo({ row, youtubeId }: { row: DoublesRally; youtubeId:
       <div className="mt-1.5">
         {useClip ? (
           <span className="mono text-[10px] tracking-[0.14em]" style={{ color: "var(--ai)" }}>
-            ● AI-ANNOTATED — 4-player pose · names · roles · formation · machine-read score
+            ● AI-ANNOTATED — 4-player pose · names · roles · formation · shuttle · shot calls · machine-read score
           </span>
         ) : (
           <span className="mono text-[10px] tracking-[0.14em] text-dim">

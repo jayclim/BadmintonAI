@@ -2,9 +2,10 @@
 
 Writes an MP4 of a rally with: the reprojected court, the four players boxed + pose
 skeletons, labelled with name (per-set roster when known) + front/back role, a banner
-showing each side's debounced formation, and the machine-read scoreboard score. It is the
-doubles analogue of `render_overlay.render(ai_only=True)` — but doubles has no shuttle /
-shot calls, so the annotations are the 4-player pose + roles + formation + score.
+showing each side's debounced formation, the machine-read scoreboard score, and — since
+`doubles/strokes.py` — the shuttle trail plus a contact ring + shot-type call at each
+CV-detected hit, matching the singles `render_overlay` annotations. Shuttle/stroke layers
+degrade to absent when the match has no shuttle track or written strokes.
 
 Self-contained per the isolation rule: reads `tracks` + the homography + the doubles
 sibling modules, plus low-level `scoreboard` for the OCR score readout. Encodes to a
@@ -28,6 +29,9 @@ from . import identity, roles
 # BGR per slot: near pair green / cyan, far pair yellow / magenta (matches the 2D replay hues)
 COL = {"near": (80, 255, 80), "near2": (255, 200, 0),
        "far": (60, 255, 255), "far2": (255, 60, 255)}
+
+TRAIL = 12          # shuttle trail length (frames)
+HIT_RING = 10       # frames a contact ring + shot call stays on screen
 
 # COCO-17 skeleton bones (keypoint index pairs) — same as render_overlay.SKELETON
 SKELETON = [(5, 7), (7, 9), (6, 8), (8, 10), (5, 6), (5, 11), (6, 12), (11, 12),
@@ -105,8 +109,20 @@ def render_rally(match_id: str, start: int, end: int, out_path,
         "SELECT frame_num, player_id, bbox, keypoints FROM tracks WHERE match_id=? "
         "AND player_id IN ('near','near2','far','far2') AND frame_num BETWEEN ? AND ?",
         [match_id, start, end]).fetch_df()
+    # CV contacts + shot calls (empty pre-strokes); shuttle trail from the shuttle track
+    stroke_rows = con.execute(
+        "SELECT frame_num, hitter, shot_type, hit_x, hit_y FROM strokes WHERE match_id=? "
+        "AND source='pipeline' AND frame_num BETWEEN ? AND ? ORDER BY frame_num",
+        [match_id, start, end]).fetchall()
     con.close()
     by_frame = {f: g for f, g in df.groupby("frame_num")}
+    try:
+        from .. import hits as _hits
+        from ..insights import SHOT_DISPLAY    # presentation renames, as in export_web
+        shu = _hits.shuttle_series(match_id, start, end)[["img_x", "img_y"]]
+        shu = None if shu["img_y"].isna().all() else shu
+    except Exception:
+        shu, SHOT_DISPLAY = None, {}
 
     # debounced formation + front slot, per (frame, side) — scoped to the rally window
     rd = roles.roles_df(match_id, start, end)
@@ -150,6 +166,22 @@ def render_rally(match_id: str, start: int, end: int, out_path,
                     _draw_skeleton(frame, kp, col)
                 cv2.putText(frame, label, (int(cx - w / 2), int(cy - h / 2) - 6),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
+        # shuttle trail (last TRAIL frames, thickening toward the present)
+        if shu is not None:
+            seg = shu.loc[max(start, fr - TRAIL):fr].dropna()
+            pts = seg.to_numpy().astype(int)
+            for j in range(1, len(pts)):
+                cv2.line(frame, tuple(pts[j - 1]), tuple(pts[j]),
+                         (255, 255, 255), 1 + (2 * j) // max(1, len(pts)))
+            if len(pts):
+                cv2.circle(frame, tuple(pts[-1]), 4, (255, 255, 255), -1)
+        # contact ring + shot call at each CV-detected hit (hitter's colour)
+        for sf, hitter, shot, hx, hy in stroke_rows:
+            if hx is not None and 0 <= fr - sf <= HIT_RING:
+                col = COL.get(hitter, (255, 255, 255))
+                cv2.circle(frame, (int(hx), int(hy)), 14, col, 2)
+                cv2.putText(frame, SHOT_DISPLAY.get(shot, shot), (int(hx) + 18, int(hy) - 8),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, col, 2)
         # formation banner (top-left)
         cv2.rectangle(frame, (0, 0), (wpx, 28), (0, 0, 0), -1)
         cv2.putText(frame, f"near: {form.get((fr, 'near'), '-')}    far: {form.get((fr, 'far'), '-')}"

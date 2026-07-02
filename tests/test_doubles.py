@@ -408,6 +408,22 @@ def test_control_attacking_team_exceeds_half():
     assert control.near_control_mask(pos, gx, gy).mean() > 0.55
 
 
+def test_segment_merge_close_windows():
+    """Fragments within GAP_MERGE_S of a neighbour reunite; distant windows don't."""
+    ws = [(0, 300), (330, 400), (1000, 1600), (1650, 1700), (3000, 3300)]
+    merged = segment._merge_close(ws, fps=30.0, gap_s=5.0)  # 1-1.6s gaps merge, 43s doesn't
+    assert merged == [(0, 400), (1000, 1700), (3000, 3300)], merged
+
+
+def test_segment_restart_truncation():
+    """Contacts after a >RESTART_GAP pause are the dead-shuttle pickup — cut there."""
+    cs = [{"frame": f} for f in (100, 130, 155, 190, 330, 350)]  # 140f pause after 190
+    kept = segment._truncate_restarts(cs)
+    assert [c["frame"] for c in kept] == [100, 130, 155, 190], kept
+    assert segment._truncate_restarts(cs[:1]) == cs[:1]  # single contact passes through
+    assert segment._truncate_restarts([]) == []
+
+
 def _run() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

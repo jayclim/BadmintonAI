@@ -109,18 +109,31 @@ detected (47 / 47 / 69 rallies), the decider's 11-point swap located at the righ
 set-1 attack split (B 72% vs A 39%) matches who won that game. The web is fully team-keyed
 (`Team = "A"|"B"`, `TEAM_COLOR`); dot/timeline colours follow the team through end-swaps.
 
-Rally segmentation is **scoreboard-gated** (`segment.rally_windows`, on by default): the raw
-tracks-only pass over-segments badly because there is no court-line detector — every detection is
-projected through one hand-calibrated homography regardless of where the camera points, so intro /
-crowd / warm-up footage AND mid-match replays + celebrations all show "4 players in court" and leak
-in as fake rallies. The gate keeps a window only if the live BWF score overlay reads in it (live
-play always carries the graphic; B-roll reads zero). On `wtf_2024_md_sf` this drops 43 of 163
-candidates → **120 live rallies** (close to the ~127 true points), removing the intro footage and
-replays the raw pass invented. It degrades to ungated if the score box can't be calibrated.
+Rally segmentation is **scoreboard-gated, fragment-merged and contact-trimmed**
+(`segment.rally_windows`, all on by default). Three layers, because "4 tracked people in court"
+alone over-segments badly:
 
-Caveats: the gate needs readable scoreboard OCR; a few real rallies are still missed where tracking
-drops all four players (120 vs ~127); the per-player net-hunter is computed only for sets with a
-`doubles_identity` roster (set 1 here).
+1. **Scoreboard gate** — keep a window only if the live BWF score overlay reads in it (live play
+   always carries the graphic; intro/crowd/replay/celebration B-roll reads zero). Degrades to
+   ungated if the score box can't be calibrated.
+2. **Merge** — the gate can't catch DEAD-TIME between points (wide shot, all 4 milling about,
+   graphic still up). Measured on `wtf_2024_md_sf`, every such fragment sits <3 s from a
+   neighbouring window while real consecutive points are ≥5.2 s apart (median 18.5 s) — and a
+   mid-rally all-4 dropout splits one real rally into two equally-close windows. Windows closer
+   than `GAP_MERGE_S` (5 s) are merged, repairing both.
+3. **Contact trim** — each window is cut to its detected shuttle-contact span (`strokes.contacts`;
+   start ≈ the serve, end ≈ last hit + 2 s), truncating the contact list at the first >2.5 s pause
+   (a dead-shuttle pickup — singles' "restart truncation" by timing). A window with <2 surviving
+   contacts is dropped if the shuttle track was densely visible (evidence of no play), kept
+   untrimmed if not (fail open).
+
+On `wtf_2024_md_sf`: 163 candidates → **101 rallies** (29/29/43 per set). The slow OCR layers are
+disk-cached per window (`data/cache/`, gitignored) with live progress counters, so interrupted runs
+resume and repeat runs are near-instant.
+
+Caveats: the gate needs readable scoreboard OCR; some real rallies are missed outright where
+tracking drops all four players (101 vs ~127 true points); the per-player net-hunter is computed
+only for sets with a `doubles_identity` roster (set 1 here).
 
 ## Persistent identity (optional layer — `doubles/identity.py`)
 
@@ -188,10 +201,12 @@ table, which doubles has no rows in.)
   rule (no import of the high-level singles `export_web`).
 - **Annotated clips (`doubles/render.py` + `scripts/render_doubles_clips.py`):** one MP4 per rally
   with the reprojected court, 4 pose skeletons/boxes, name (set-1 roster) + front/back role labels,
-  the attack/defence formation banner, and the machine-read score, encoded 540p H.264 — the doubles
-  analogue of `render_overlay.render(ai_only=True)` (doubles has no shuttle/shot calls). Written to
-  `web/public/clips/<id>/f<a>-<b>.mp4` (same naming the exporter maps on by overlap), git-tracked
-  like the singles clips. `roles.roles_df(match_id, start, end)` is windowed so each per-rally
+  the attack/defence formation banner, the machine-read score, and — since `doubles/strokes.py` —
+  the **shuttle trail + a contact ring & shot-type call at each CV-detected hit** (the full singles
+  `render_overlay` annotation set; shuttle/stroke layers degrade to absent pre-strokes). Encoded
+  540p H.264, written to `web/public/clips/<id>/f<a>-<b>.mp4` (same naming the exporter maps on by
+  overlap), git-tracked like the singles clips. The batch script skips clips that already exist
+  (resumable) and deletes stale ones when the rally windows change. `roles.roles_df(match_id, start, end)` is windowed so each per-rally
   render is cheap (~1.6s) instead of re-scanning the whole-match tracks.
 - **Points (`doubles/points.py`, pure + unit-tested):** the score story from the per-rally
   scoreboard OCR — per-set worm trajectory, set winners, longest momentum run, and short/mid/long
@@ -237,8 +252,10 @@ table, which doubles has no rows in.)
   clips mapped. `tests/test_doubles.py` = 35/35. The official scoreline lives in `matches.yaml`
   as `result:` (display-only context).
 
-To refresh after re-tracking: `py scripts/render_doubles_clips.py --match <id>` then
-`py -m badminton.doubles.export_web <id>` then `cd web && npm run build`.
+To refresh everything after re-tracking (or a segmentation change): **`scripts/refresh_doubles.sh
+<id>`** — strokes → clips → export → commentary → web build, in dependency order. Every step is
+idempotent (OCR disk-cached, clips skipped when present), so an interrupted run just re-runs and
+continues where it stopped, with live progress throughout.
 
 ## AI commentary (`doubles/commentary.py`)
 

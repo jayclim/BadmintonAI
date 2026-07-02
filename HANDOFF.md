@@ -14,7 +14,29 @@ surfaces movement + tactics + pressure analytics, plus rally video clips (raw & 
 **Direction (locked):** controlled-capture eventually (any decent camera) · analytics
 dashboard first → tactical commentary later · singles first → doubles later.
 
-## 2. Current status (as of 2026-06-18)
+## 2. Current status (as of 2026-07-01)
+
+- **DOUBLES — DEAD-TIME SEGMENTATION FIX + FULL SHUTTLE OVERLAY (2026-07-01).** The scoreboard
+  gate couldn't catch between-point dead time (wide shot, all 4 on court, graphic still up), so
+  short fragments counted as rallies. `segment.rally_windows` now also MERGES windows <5 s apart
+  (fragments reunite with their parent rally; dropout-split rallies are repaired — measured
+  bimodal: fragments <3 s from a neighbour, real consecutive points ≥5.2 s) and CONTACT-TRIMS
+  each window to its shuttle-contact span with dead-shuttle restart truncation (>2.5 s pause) —
+  the same refinement path singles took. 163 candidates → **101 rallies** (29/29/43). Slow OCR
+  layers (gate + per-rally scores) are disk-cached per window in `data/cache/` (gitignored),
+  saved as they go, with live progress counters — interrupted runs resume. `doubles/render.py`
+  now draws the shuttle trail + contact ring + shot call per CV hit (full singles-style overlay);
+  clips re-rendered (stale ones auto-deleted). **`scripts/refresh_doubles.sh <id>`** = the whole
+  resumable refresh chain. NOTE: never attribute the server from the first detected stroke — the
+  contact detector misses far-side serves (window-edge extremum); `shots.rally_server` derives it
+  from the score (winner serves next). Tests 39/39.
+
+- **DOUBLES — STROKE LAYER ON THE WEB (2026-07-01, commit c7b0153).** `shots.py` grew
+  `player_mix` (keyed (set,team,idx) like movement), score-derived `rally_server`/`serve_receive`
+  and `finishers`; exporter emits them in `doubles.json` `shots` + per-rally stroke sequences in
+  dreplay; web gained serve/receive + finishing-shots panels (Points), TOP SHOTS chips per player
+  (Court), shot-sequence card + contact ticks (Film); commentary prompt un-gagged and its dossier
+  now carries the shot tables.
 
 - **DOUBLES — SCOREBOARD-GATED RALLY SEGMENTATION (2026-06-18).** Fixed false rallies: the
   tracks-only `doubles/segment.py` was tagging intro/crowd/warm-up footage AND mid-match
