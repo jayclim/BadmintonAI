@@ -428,8 +428,8 @@ def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
             r = mine.loc[mine["winners"].idxmax()]
             total = int(mine["winners"].sum())
             notes.append(dict(icon="🗡️", score=r["winners"] * 1.5,
-                              title=f"{nm}'s {r['shot']} was his biggest weapon",
-                              body=f"{r['winners']} of his {total} outright winners came from the "
+                              title=f"{nm}'s {r['shot']} was their biggest weapon",
+                              body=f"{r['winners']} of their {total} outright winners came from the "
                                    f"{r['shot']}. Expect it — and train the counter.",
                               keys=keys_for(p, r["shot"], won=True)))
         # 2) biggest leak
@@ -452,15 +452,15 @@ def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
         if known >= 8:
             unf = _pct(e["unforced"], known)
             if unf >= 60:
-                body = (f"{e['unforced']} of his {known} pressure-rated errors came from a "
+                body = (f"{e['unforced']} of their {known} pressure-rated errors came from a "
                         f"comfortable position (<{FORCED_SPEED} m/s required movement). "
                         "These are free points to claw back — focus errors, not fitness.")
                 title = f"{names[p]}'s errors were mostly unforced ({unf}%)"
             elif unf <= 40:
                 body = (f"{e['forced']} of {known} errors came while scrambling at "
-                        f"≥{FORCED_SPEED} m/s — his opponent earned them with placement. "
+                        f"≥{FORCED_SPEED} m/s — their opponent earned them with placement. "
                         "Work on earlier recovery to the base.")
-                title = f"{names[p]} was forced into his errors ({100 - unf}%)"
+                title = f"{names[p]} was forced into their errors ({100 - unf}%)"
             else:
                 continue
             errs = finished[(finished["end_hitter"] == p) & (finished["category"] != "Winner")]
@@ -492,11 +492,11 @@ def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
                 d = finished[finished["bucket"] == ("short (≤4)" if better == "short" else "long (10+)")]
                 notes.append(dict(icon="⏱️", score=abs(int(s["win_pct"]) - int(lg["win_pct"])) / 4,
                                   title=f"{names[p]} thrived in {better} rallies",
-                                  body=f"He won {s['win_pct']}% of short rallies (≤4 shots) vs "
+                                  body=f"They won {s['win_pct']}% of short rallies (≤4 shots) vs "
                                        f"{lg['win_pct']}% of long ones (10+). "
-                                       + ("Force quick exchanges against him — or extend them yourself."
+                                       + ("Force quick exchanges against them — or extend them yourself."
                                           if better == "short" else
-                                          "Keep the shuttle alive against him only if you can match his legs."),
+                                          "Keep the shuttle alive against them only if you can match their legs."),
                                   keys=list(zip(d["set_no"], d["rally_id"]))))
 
     # 6) serve edge
@@ -510,7 +510,7 @@ def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
                 verdict = "a genuine edge" if pct >= 58 else "a liability"
                 notes.append(dict(icon="🎯", score=abs(pct - 50) / 5 + 1,
                                   title=f"Serving was {verdict} for {names[p]}",
-                                  body=f"He won {pct}% of his {s['serve_n']} service points "
+                                  body=f"They won {pct}% of their {s['serve_n']} service points "
                                        f"(vs {_pct(s['recv_won'], s['recv_n'])}% when receiving).",
                                   keys=list(zip(d["set_no"], d["rally_id"]))))
 
@@ -536,8 +536,8 @@ def coach_notes(match_id: str, rdf: pd.DataFrame, sdf: pd.DataFrame,
                          & (finished["category"] != "Winner")]
             notes.append(dict(icon="🫲", score=(b["err_pct"] - b["usage_pct"]) / 4 + 2,
                               title=f"{names[p]}'s backhand cracked under fire",
-                              body=f"Backhands were {b['usage_pct']}% of his shots but "
-                                   f"{b['err_pct']}% of his rally-ending errors. Attack that wing.",
+                              body=f"Backhands were {b['usage_pct']}% of their shots but "
+                                   f"{b['err_pct']}% of their rally-ending errors. Attack that wing.",
                               keys=list(zip(d["set_no"], d["rally_id"]))))
 
     notes.sort(key=lambda x: -x["score"])

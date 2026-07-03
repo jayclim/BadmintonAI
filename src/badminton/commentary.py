@@ -58,8 +58,9 @@ on them, reconcile them with the numbers, and go deeper; don't just restate them
 - Court positions and distances come from validated CV tracking (median error ~0.6 m).
 
 Write like a coach talking to coaches: concrete, evidence-cited (use the actual \
-numbers), tactically specific, no fluff. Prefer "his cross-court defensive lift under \
-pressure" over "his defense". Every claim must be supported by a number in the dossier. \
+numbers), tactically specific, no fluff. Prefer "their cross-court defensive lift under \
+pressure" over "their defense". Use gender-neutral pronouns (they/their/them) for all players. \
+Every claim must be supported by a number in the dossier. \
 Do not invent events (specific rallies, shouts, crowd, injuries) that are not in the data."""
 
 
@@ -67,13 +68,13 @@ Do not invent events (specific rallies, shouts, crowd, injuries) that are not in
 
 class PlayerReport(BaseModel):
     name: str = Field(description="Player's name exactly as given in the dossier")
-    overview: str = Field(description="2-3 sentence tactical assessment of his match")
+    overview: str = Field(description="2-3 sentence tactical assessment of their match")
     strengths: list[str] = Field(description="2-4 specific strengths, each citing numbers")
     weaknesses: list[str] = Field(description="2-4 specific weaknesses, each citing numbers")
     training_priorities: list[str] = Field(
         description="2-3 concrete drills/focus areas derived from the weaknesses")
     gameplan_against: str = Field(
-        description="One paragraph: how a future opponent should play him")
+        description="One paragraph: how a future opponent should play them")
 
 
 class MatchCommentary(BaseModel):
@@ -336,7 +337,7 @@ def to_markdown(record: dict) -> str:
         lines += [f"- {w}" for w in p["weaknesses"]]
         lines += ["", "**Training priorities**"]
         lines += [f"- {t}" for t in p["training_priorities"]]
-        lines += ["", f"**How to beat him:** {p['gameplan_against']}"]
+        lines += ["", f"**How to beat them:** {p['gameplan_against']}"]
     return "\n".join(lines)
 
 

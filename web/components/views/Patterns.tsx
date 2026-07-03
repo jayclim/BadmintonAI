@@ -113,7 +113,7 @@ export default function Patterns({ d, src, goFilm }: ViewProps) {
                               <span
                                 className="mono text-[10px] w-14 text-right"
                                 style={{ color: r.winPct >= 55 ? "var(--win)" : r.winPct <= 45 ? "var(--err)" : "var(--dim)" }}
-                                title="how often he goes on to win the rally after this reply"
+                                title="how often they go on to win the rally after this reply"
                               >
                                 {r.winPct}% win
                               </span>

@@ -6,7 +6,7 @@ data (CLAUDE.md said not to fake these until 4-slot hit attribution was real; it
 Two views the formation layer can't express:
   - shot_mix: what each team hits (shot-type distribution), per set and overall;
   - response_matrix: given the opponent's shot X, what the team answers with (X → Y),
-    the doubles analogue of the singles "vs X he plays Y" matrix.
+    the doubles analogue of the singles "vs X they play Y" matrix.
 
 Team-keying is the whole subtlety (see sets.py): the pairs SWAP ENDS between games, so a
 court side ('near'/'far') is NOT a stable team. `sets.analyze` maps each rally's near/far
