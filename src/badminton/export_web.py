@@ -578,6 +578,10 @@ def main() -> None:
     ids = [r[0] for r in con.execute(
         "SELECT DISTINCT match_id FROM strokes ORDER BY match_id").fetchall()]
     con.close()
+    # doubles matches ship via their own export (doubles_index.json) — keep
+    # them out of the singles index
+    ids = [i for i in ids
+           if config.get_match(i).get("discipline", "singles") != "doubles"]
     if args.match:
         ids = [args.match]
 

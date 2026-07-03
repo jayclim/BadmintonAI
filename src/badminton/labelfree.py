@@ -149,6 +149,14 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
         if r["score_a"] is None:
             r["score_a"], r["score_b"] = pa, pb
         prev[sn] = (r["score_a"], r["score_b"])
+        # the OCR event's winner (row comparison) is corrupt across set
+        # boundaries (20-13 -> 1-0 reads as a negative jump); the score delta
+        # within the set is the same source but always oriented right
+        da, db_ = r["score_a"] - pa, r["score_b"] - pb
+        if (da, db_) == (1, 0):
+            r["winner"] = "A"
+        elif (da, db_) == (0, 1):
+            r["winner"] = "B"
 
     # --- side of player A per RALLY ("winner serves next" votes, flip-aware).
     # Each winner event constrains which side the winning ROW serves the NEXT
@@ -171,40 +179,38 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
     flipped = {"near": "far", "far": "near"}
     top_fn: dict[int, tuple[str, int | None]] = {}   # set -> (start side, flip rally_id|None)
     sets_in_rows = sorted({r["set_no"] for r in rows})
-    for sn in sets_in_rows:
-        vs = sorted(votes.get(sn, []))
-        if not vs:
-            continue
-        # The end change at 11 exists ONLY in a deciding game — candidates are
-        # restricted to set 3+ (a false flip from vote noise corrupts half a set).
-        cands: list[int] = []
-        if sn >= 3 and sn == sets_in_rows[-1]:
-            cands = [r["rally_id"] for r in rows if r["set_no"] == sn
-                     and max(r["prev_a"], r["prev_b"]) == 11]
-            if not cands:
-                cands = [r["rally_id"] for r in rows if r["set_no"] == sn
-                         and max(r["prev_a"], r["prev_b"]) in (10, 12)]
-        best = None                                  # (score, has_flip, side, k)
-        for side in ("near", "far"):
-            score0 = sum((side == s) for _, s in vs)
-            if best is None or score0 > best[0]:
-                best = (score0, False, side, None)
-            for k in cands:
-                score = sum(((side if rid < k else flipped[side]) == s) for rid, s in vs)
-                if score >= (best[0] + 2 if not best[1] else best[0] + 1):
-                    best = (score, True, side, k)
-        top_fn[sn] = (best[2], best[3] if best[1] else None)
-    # vote-less sets: players swap ends between sets — alternate from a neighbor
-    for idx, sn in enumerate(sets_in_rows):
-        if sn in top_fn:
-            continue
-        for d in (-1, 1):
-            nb = sets_in_rows[idx + d] if 0 <= idx + d < len(sets_in_rows) else None
-            if nb in top_fn:
-                start, k = top_fn[nb]
-                end_side = flipped[start] if k is not None else start
-                top_fn[sn] = (flipped[end_side] if d == -1 else flipped[start], None)
-                break
+
+    # The rules pin everything except ONE bit: ends alternate between sets, and
+    # the deciding game's end change at leader-11 always happens. So the flip
+    # rally comes from the scores, and the single free parameter — set 1's
+    # start side — is fit on ALL sets' votes pooled (per-set fits are too
+    # noisy: serve-side detection bias can tie or invert a single set).
+    flip_at: dict[int, int] = {}
+    last = sets_in_rows[-1]
+    if last >= 3:
+        cands = [r["rally_id"] for r in rows if r["set_no"] == last
+                 and max(r["prev_a"], r["prev_b"]) == 11]
+        if not cands:                        # OCR missed the point at 11
+            cands = [r["rally_id"] for r in rows if r["set_no"] == last
+                     and max(r["prev_a"], r["prev_b"]) in (10, 12)]
+        if cands:
+            flip_at[last] = min(cands)
+
+    def _start(sn: int, s1: str) -> str:
+        return s1 if sets_in_rows.index(sn) % 2 == 0 else flipped[s1]
+
+    if votes:
+        best = None                                  # (pooled vote score, s1)
+        for s1 in ("near", "far"):
+            score = 0
+            for sn, vs in votes.items():
+                start, k = _start(sn, s1), flip_at.get(sn)
+                score += sum((start if k is None or rid < k else flipped[start]) == s
+                             for rid, s in vs)
+            if best is None or score > best[0]:
+                best = (score, s1)
+        for sn in sets_in_rows:
+            top_fn[sn] = (_start(sn, best[1]), flip_at.get(sn))
 
     for r in rows:
         fn = top_fn.get(r["set_no"])
@@ -505,6 +511,23 @@ def validate(match_id: str) -> None:
                 ok += x == y
     print(f"rally winners (order-aligned): {ok}/{tot} agree "
           f"({ok / tot:.1%})" if tot else "no comparable winners")
+
+    # score-aligned winners: score pairs are unique within a set, so this is
+    # robust to rally-segmentation drift (order alignment decays toward 50%
+    # when the pipeline splits rallies differently than the labels)
+    lab_w = {(int(r.set_no), int(r.score_a), int(r.score_b)): r.winner
+             for r in rdf_lab.itertuples()
+             if r.winner and r.score_a is not None}
+    ok = tot = 0
+    for r in rdf_lf.itertuples():
+        if r.score_a is None or not r.winner:
+            continue
+        w = lab_w.get((int(r.set_no), int(r.score_a), int(r.score_b)))
+        if w:
+            tot += 1
+            ok += w == r.winner
+    print(f"rally winners (score-aligned): {ok}/{tot} agree"
+          + (f" ({ok / tot:.1%})" if tot else ""))
 
     lab_sm = insights.side_map_from(sdf_lab)
     lf_sm = side_map(match_id)

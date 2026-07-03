@@ -100,6 +100,7 @@ all_england_2022_sf:
   - -7.998469665831292e-05
   - 0.007484366783283409
   - 1.0
+  ss_shuttle_offset: -1
 wtf_2024_md_sf:
   match_id: wtf_2024_md_sf
   discipline: doubles
