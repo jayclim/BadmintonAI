@@ -168,10 +168,40 @@ court mapping; shot classification (72–83%) is BST-0's accuracy on my pipeline
 detection (F1 87.9), landings (0.55 m), rally segmentation (F1 97.6), and score OCR (95.2%)
 are produced by original code.
 
-**Licenses:** YOLO11/Ultralytics is **AGPL-3.0** (weights are gitignored, auto-downloaded — not
-redistributed here); TrackNetV3 and BST are MIT (vendored with their LICENSE files). See
-[`LICENSES/README.md`](LICENSES/README.md) before redistributing or deploying the pipeline as a
-network service.
+### Licenses
+
+COURTSIDE's own code is [MIT](LICENSE). Third-party models, data, and libraries keep their own
+licenses — see [`LICENSES/README.md`](LICENSES/README.md) for the obligations before
+redistributing anything or deploying the pipeline as a network service.
+
+**Pretrained models & data** (all used without fine-tuning):
+
+| Component | Role | License |
+|---|---|---|
+| [YOLO11-Pose / Ultralytics](https://github.com/ultralytics/ultralytics) | player detection + pose | ⚠️ [AGPL-3.0](https://github.com/ultralytics/ultralytics/blob/main/LICENSE) — copyleft incl. network use; weights gitignored, never redistributed here |
+| [ByteTrack](https://github.com/ifzhang/ByteTrack) | player identity across frames | [MIT](https://github.com/ifzhang/ByteTrack/blob/main/LICENSE) upstream; the implementation actually run is Ultralytics' bundled tracker, so it ships under AGPL-3.0 |
+| [TrackNetV3](https://github.com/qaz812345/TrackNetV3) | shuttle trajectory | [MIT](third_party/TrackNetV3/LICENSE) (vendored, unmodified) |
+| [BST-0](https://github.com/Va6lue/BST-Badminton-Stroke-type-Transformer) ([paper](https://arxiv.org/abs/2502.21085)) | stroke-type classification | [MIT](third_party/BST/LICENSE) (vendored) |
+| [ShuttleSet / ShuttleSet22](https://github.com/wywyWang/CoachAI-Projects) | ground-truth annotations, Tier-1 schema | [MIT](https://github.com/wywyWang/CoachAI-Projects/blob/main/LICENSE) — cite the ShuttleSet paper in published results |
+
+**Libraries** (Python pipeline):
+
+| Library | License |
+|---|---|
+| [PyTorch](https://pytorch.org/) | [BSD-3-Clause](https://github.com/pytorch/pytorch/blob/main/LICENSE) |
+| [OpenCV](https://opencv.org/) (`opencv-python`) | [Apache-2.0](https://opencv.org/license/) |
+| [NumPy](https://numpy.org/) · [SciPy](https://scipy.org/) · [pandas](https://pandas.pydata.org/) · [scikit-learn](https://scikit-learn.org/) · [Altair](https://altair-viz.github.io/) | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
+| [DuckDB](https://duckdb.org/) · [PyYAML](https://pyyaml.org/) · [pydantic](https://docs.pydantic.dev/) · [anthropic](https://github.com/anthropics/anthropic-sdk-python) · [gdown](https://github.com/wkentaro/gdown) · [parse](https://github.com/r1chardj0n3s/parse) · [positional-encodings](https://github.com/tatp22/multidim-positional-encoding) · [torchinfo](https://github.com/TylerYep/torchinfo) | [MIT](https://spdx.org/licenses/MIT.html) |
+| [Streamlit](https://streamlit.io/) · [Requests](https://requests.readthedocs.io/) | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
+| [matplotlib](https://matplotlib.org/) | [PSF-based matplotlib license](https://matplotlib.org/stable/project/license.html) |
+| [pycocotools](https://github.com/ppwwyyxx/cocoapi) | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | [Unlicense](https://spdx.org/licenses/Unlicense.html) |
+
+**Libraries** (web dashboard): [Next.js](https://nextjs.org/), [React](https://react.dev/), and
+[Tailwind CSS](https://tailwindcss.com/) are [MIT](https://spdx.org/licenses/MIT.html);
+[TypeScript](https://www.typescriptlang.org/) is
+[Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) (plus MIT-licensed dev tooling:
+`@types/*`, `@tailwindcss/postcss`).
 
 ## Docs
 
