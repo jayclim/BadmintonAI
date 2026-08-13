@@ -32,7 +32,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from . import analytics, config, court, db
+from . import analytics, config, court, db, score_seq
 
 SNAP_DIR = config.REPO_ROOT / "data" / "labelfree"
 CLUTCH_FROM = 18          # keep in sync with insights.CLUTCH_FROM
@@ -158,6 +158,30 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
         elif (da, db_) == (0, 1):
             r["winner"] = "B"
 
+    # --- close out each game on the scoring RULES.
+    # The broadcast cuts to the crowd on set point, so the overlay's winning
+    # reading is routinely never sampled and a 21-17 set gets reported as 19-17
+    # (measured: 0/4 labeled matches had every scoreline right without this).
+    # score_seq rebuilds the legal point log — misreads dropped, skipped readings
+    # split back into the rallies they belong to, the tail finished by rule — and
+    # the last DETECTED rally of each game carries that game's true final.
+    plog = score_seq.point_log(
+        [(int(e["set_no"]), int(e["top"]), int(e["bot"]), i)
+         for i, (_, e) in enumerate(ev.iterrows())])
+    n_points: dict[int, int] = {}
+    for sn, *_ in plog:
+        n_points[sn] = n_points.get(sn, 0) + 1
+    for sn, (t, b) in score_seq.set_finals(plog).items():
+        fa, fb = (t, b) if row_a == "top" else (b, t)
+        in_set = [r for r in rows if r["set_no"] == sn]
+        if not in_set or (in_set[-1]["score_a"], in_set[-1]["score_b"]) == (fa, fb):
+            continue
+        r = in_set[-1]
+        r["score_a"], r["score_b"] = fa, fb
+        da, db_ = fa - r["prev_a"], fb - r["prev_b"]
+        if da or db_:                     # who took the game-winning rally
+            r["winner"] = "A" if da >= db_ else "B"
+
     # --- side of player A per RALLY ("winner serves next" votes, flip-aware).
     # Each winner event constrains which side the winning ROW serves the NEXT
     # rally from. Per set we fit top's side as a step function with at most ONE
@@ -228,9 +252,22 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
         if ss:
             side_a[sn] = max(set(ss), key=ss.count)
 
+    # points the rules say were played vs rallies the segmenter found: a positive
+    # gap is missed rallies, and it is the honest bound on per-rally attribution
+    # (a point whose rally was never detected cannot be attributed to it).
+    n_rallies: dict[int, int] = {}
+    for r in rows:
+        n_rallies[r["set_no"]] = n_rallies.get(r["set_no"], 0) + 1
+    missing = {str(sn): n_points.get(sn, 0) - n_rallies.get(sn, 0)
+               for sn in sorted(set(n_points) | set(n_rallies))}
+
     snap = dict(match_id=match_id, row_a=row_a,
                 side_a={str(sn): s for sn, s in side_a.items()},
                 flips={str(sn): k for sn, (_, k) in top_fn.items() if k is not None},
+                # oriented A-B (not top/bot) like every other score in the snapshot
+                set_finals={str(sn): ([t, b] if row_a == "top" else [b, t])
+                            for sn, (t, b) in score_seq.set_finals(plog).items()},
+                rallies_missing=missing,
                 rallies=rows,
                 # raw OCR readings, kept for the dashboard's OCR demo + fast rebuilds
                 events=[dict(frame=int(e["frame"]), set_no=int(e["set_no"]),

@@ -374,6 +374,52 @@ def test_points_clean_drops_dupes_and_regressions():
         (1, 1, 0, "A"), (3, 1, 1, "B"), (6, 2, 1, "A")]
 
 
+def test_points_clean_splits_multi_point_jumps():
+    """A jump of n points is n rallies the OCR read once — not one rally worth n points.
+
+    The old cleaner credited the whole jump to whichever team's score moved most, which
+    both lost points and mis-attributed them; on the tracked doubles match that dropped
+    46 of 127 points. Each point must now land on the team that actually scored it."""
+    from badminton.doubles import points
+    rows = [
+        {"rally": 1, "a": 1, "b": 0},
+        {"rally": 2, "a": 1, "b": 3},   # B won three in a row; the OCR read the last one
+        {"rally": 3, "a": 2, "b": 4},   # one each — a (1,1) jump, not a single A point
+    ]
+    pts = points.clean_set_scores(rows)
+    # totals are exact; within a jump the ORDER is not recoverable from the score alone,
+    # so score_seq emits the B-side points first by convention
+    assert [(p["a"], p["b"], p["winner"]) for p in pts] == [
+        (1, 0, "A"), (1, 1, "B"), (1, 2, "B"), (1, 3, "B"), (1, 4, "B"), (2, 4, "A")], pts
+    # only the READ rallies keep a rally id; reconstructed points have none
+    assert [p["rally"] for p in pts] == [1, None, None, 2, None, 3]
+    assert [p["synth"] for p in pts] == [False, True, True, False, True, False]
+
+
+def test_points_clean_finishes_a_cut_away_set():
+    """The broadcast cuts away on set point, so the winning read is never sampled."""
+    from badminton.doubles import points
+    rows = [{"rally": 1, "a": 19, "b": 15}, {"rally": 2, "a": 20, "b": 15}]
+    pts = points.clean_set_scores(rows)
+    assert (pts[-1]["a"], pts[-1]["b"]) == (21, 15)
+    assert pts[-1]["synth"] and pts[-1]["rally"] is None
+
+
+def test_points_build_ignores_reconstructed_points_for_rally_stats():
+    """Reconstructed points have no rally window, so they carry no duration and must not
+    be bucketed into rally-length win rates."""
+    from badminton.doubles import points
+    rally_scores = [(0, 9, 1, 0), (10, 19, 3, 0)]      # second read skipped a point
+    rsides = [{"set": 1} for _ in rally_scores]
+    out = points.build(rally_scores, rsides, fps=30.0, top_team="A")
+    pts = out["sets"][0]["points"]
+    assert [(p["a"], p["b"]) for p in pts] == [(1, 0), (2, 0), (3, 0)]
+    assert out["sets"][0]["final"] == {"a": 3, "b": 0}
+    # 3 points, but only the 2 with real rally windows are length-bucketed
+    assert sum(out["lengthWins"]["A"].values()) == 2
+    assert set(out["rallyWinner"]) == {"1", "2"}
+
+
 def test_points_build_maps_rows_to_teams_and_detects_winner():
     """build(): top/bot rows map to teams A/B via top_team; final + set winner are derived
     from the accepted trajectory, and a longest-run is counted."""

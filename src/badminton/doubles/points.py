@@ -36,27 +36,27 @@ def _bucket(dur_s: float) -> str:
 
 
 def clean_set_scores(rows: list[dict]) -> list[dict]:
-    """Reduce one set's per-rally (rally, a, b) reads to a clean, monotonic point log.
+    """Reduce one set's per-rally (rally, a, b) reads to a clean, legal point log.
 
     `rows`: ordered [{rally, a, b}] where a/b are team A/B scoreboard scores (a/b may be
-    None on an OCR miss). Tracks-only segmentation slightly over-segments and the OCR drops
-    reads, so we keep only rallies whose readable score is a single-team +1 step over the
-    last accepted score (the real point). Duplicates (replays, dead-time windows) and
-    regressions/garbage are dropped. Returns [{rally, a, b, winner}] at each scored point."""
-    out: list[dict] = []
-    la, lb = 0, 0
-    for r in rows:
-        a, b = r["a"], r["b"]
-        if a is None or b is None:
-            continue
-        da, db = a - la, b - lb
-        # exactly one team advanced by one (clean point); tolerate a jump after OCR gaps by
-        # accepting any forward move where total increased and neither score went backwards
-        if a >= la and b >= lb and (a + b) > (la + lb):
-            winner = "A" if da >= db else "B"
-            out.append({"rally": r["rally"], "a": int(a), "b": int(b), "winner": winner})
-            la, lb = a, b
-    return out
+    None on an OCR miss). Decoding is delegated to the shared, discipline-agnostic
+    `badminton.score_seq` (repair -> expand -> complete): transient misreads are dropped,
+    a multi-point jump is split back into the one-point rallies it actually was, and a
+    game the broadcast cut away from is finished on the scoring rules.
+
+    Returns [{rally, a, b, winner, synth}] — one entry per POINT, in order. `synth` marks
+    points reconstructed from the rules rather than read off the overlay; their `rally` is
+    None because the segmenter never found a window for them (a missed rally).
+
+    This used to accept ANY forward move and credit the whole jump to one team, which both
+    lost points (a 2-0 run counted once) and mis-attributed them (a (1,2) jump was scored
+    as a single A point). On the tracked doubles match that dropped 46 of 127 points and
+    left 24 illegal transitions in the score worm."""
+    from .. import score_seq
+    reads = [(1, r["a"], r["b"], r["rally"]) for r in rows]
+    return [{"rally": ref, "a": int(x), "b": int(y),
+             "winner": "A" if who == "x" else "B", "synth": bool(synth)}
+            for _sn, x, y, who, ref, synth in score_seq.point_log(reads)]
 
 
 def _longest_run(points: list[dict], team: str) -> int:
@@ -96,6 +96,8 @@ def build(rally_scores: list[tuple], rsides: list[dict], fps: float,
         # attach duration to each accepted point for length-bucketed win rates + deep links
         dur_by_rally = {r["rally"]: r["durS"] for r in rows}
         for p in pts:
+            if p["rally"] is None:      # reconstructed point: no rally window, no duration
+                continue
             rally_winner[p["rally"]] = p["winner"]
             length_wins[p["winner"]][_bucket(dur_by_rally.get(p["rally"], 0.0))] += 1
         runs["A"] = max(runs["A"], _longest_run(pts, "A"))
