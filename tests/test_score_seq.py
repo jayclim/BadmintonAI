@@ -172,6 +172,45 @@ def test_decoded_scorelines_match_ground_truth():
     assert not bad, "scoreline mismatches:\n  " + "\n  ".join(bad)
 
 
+def test_committed_snapshots_carry_the_right_scoreline():
+    """The snapshots on disk — not just the decoder — must hold the true scoreline.
+
+    labelfree.build() writes `set_finals` into data/labelfree/<id>.json, and that is
+    what reaches the dashboard via rally_df. A correct decoder plus a stale snapshot
+    still ships 19-17 to the site, which is exactly how the original bug survived, so
+    the committed artefact is checked here rather than only the code path.
+    Regenerate with: labelfree <id> --build --from-snapshot"""
+    bad = []
+    for mid in LABELED:
+        snap = json.loads((ROOT / "data" / "labelfree" / f"{mid}.json").read_text())
+        finals = snap.get("set_finals")
+        if not finals:
+            bad.append(f"{mid}: snapshot predates score_seq (no set_finals key)")
+            continue
+        got = {int(sn): tuple(v) for sn, v in finals.items()}
+        want = {sn: tuple(v) for sn, v in _truth(mid).items()}
+        if got != want:
+            bad.append(f"{mid}: snapshot says {got}, ShuttleSet says {want}")
+    assert not bad, "stale or wrong snapshots:\n  " + "\n  ".join(bad)
+    print("ok  committed snapshots carry the true scoreline")
+
+
+def test_snapshot_side_map_is_deterministic():
+    """Per-set side_a must be the side A STARTED on, not a majority vote.
+
+    A deciding game changes ends at 11, so its majority is an exact tie about as often
+    as not (All England SF set 3 is 21-21) and the old `max(set(...), key=...)` resolved
+    it in hash order — the same snapshot rebuilt twice could disagree with itself."""
+    for mid in LABELED:
+        snap = json.loads((ROOT / "data" / "labelfree" / f"{mid}.json").read_text())
+        for sn, side in snap["side_a"].items():
+            first = next((r["side_a"] for r in snap["rallies"]
+                          if str(r["set_no"]) == str(sn) and r.get("side_a")), None)
+            assert side == first, \
+                f"{mid} set {sn}: side_a={side} but the set opens on {first}"
+    print("ok  snapshot side map is start-of-set, not a hash-order tie-break")
+
+
 def test_every_decoded_game_is_a_legal_point_path():
     """The decoded log must be a legal badminton score path: +1 to exactly one
     side per entry, and every finished game a legal final."""
