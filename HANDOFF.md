@@ -3,6 +3,11 @@
 Read this first. It's the single entry point for picking up this project. Deeper detail
 lives in `docs/` and the inline docstrings; this file is the map + the hard-won gotchas.
 
+> **Picking up work in progress?** See [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) —
+> the score decoder, the doubles identity fixes and CI are shipped on
+> `claude/badminton-analytics-improvements-svr9p2`, and it lists what still has to be run
+> on a machine that has the DuckDB (the web bundles are a `export_web` behind the fix).
+
 ---
 
 ## 1. What this is
