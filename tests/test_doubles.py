@@ -21,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from badminton import court  # noqa: E402
 from badminton.doubles import (  # noqa: E402
     control, identity, insights, movement, roles, segment, sets, smooth)
-from badminton.doubles.track import REID_RADIUS_M, SlotAssigner, _Det  # noqa: E402
+from badminton.doubles.track import (  # noqa: E402
+    HALF_FLIP_FRAMES, REID_RADIUS_M, SlotAssigner, _best_matching, _Det)
 
 _DUMMY = np.zeros((17, 2)), np.zeros(17), np.zeros(4)  # kxy, kcf, box stand-ins
 
@@ -106,6 +107,74 @@ def test_extra_detection_dropped_by_area():
                        det(3, 3.0, 3.0, area=0.1)])           # tiny = line judge / artifact
     assert {out["near"].tid, out["near2"].tid} == {1, 2}
     assert "near" not in {} and len(out) == 2
+
+
+def test_matching_is_optimal_not_greedy():
+    """The slot match must minimise TOTAL cost, not take the cheapest edge first.
+
+    Greedy grabs (0,0)=0.1 and is then forced into (1,1)=1.4 for 1.5; the optimal
+    pairing is 0.8+0.6=1.4. This is the crossing case in miniature."""
+    costs = {(0, 0): 0.1, (0, 1): 0.8, (1, 0): 0.6, (1, 1): 1.4}
+    assert sorted(_best_matching(costs, 2, 2)) == [(0, 1), (1, 0)]
+
+
+def test_matching_prefers_filling_more_slots():
+    """A detection left with no slot is worse than a mediocre pairing, so a bigger
+    matching wins even when a smaller one is cheaper per edge."""
+    costs = {(0, 0): 0.1, (0, 1): 0.2, (1, 1): 9.0}      # det 1 can only take slot 1
+    assert sorted(_best_matching(costs, 2, 2)) == [(0, 0), (1, 1)]
+    assert _best_matching({}, 2, 2) == []                 # nothing permitted -> no pairs
+
+
+def test_reid_survives_a_long_gap_through_a_crossing():
+    """Two players cross while ByteTrack has lost BOTH ids, and are recovered correctly.
+
+    The prediction must be scaled by the real gap: over 10 frames at 0.2 m/frame each
+    player travels 2 m, so a one-step extrapolation lands ~1.8 m from the truth and
+    re-IDs them into each other's slots — the identity swap that pins in for the rally."""
+    a = SlotAssigner()
+    a.update(0, [det(10, 1.0, 3.0), det(11, 5.0, 3.0)])   # near=10 (left), near2=11 (right)
+    a.update(1, [det(10, 1.2, 3.0), det(11, 4.8, 3.0)])   # closing at 0.2 m/frame each
+    # frame 11: both ids dropped through the occlusion; the players have now SWAPPED sides
+    out = a.update(11, [det(98, 3.2, 3.0), det(99, 2.8, 3.0)])
+    assert out["near"].tid == 98, "near travelled right — must follow its own velocity"
+    assert out["near2"].tid == 99
+
+
+def test_reid_gap_beyond_max_is_not_trusted():
+    """Past REID_MAX_GAP the prediction is stale, so a reappearance is a fresh identity
+    rather than a confident recovery — the widened radius must not defeat that."""
+    a = SlotAssigner()
+    a.update(0, [det(10, 1.0, 3.0), det(11, 5.0, 3.0)])
+    a.update(1, [det(10, 1.2, 3.0), det(11, 5.0, 3.0)])
+    assert a.state["near"].predict(200) is None           # stale before we ask anything of it
+    out = a.update(200, [det(98, 3.2, 3.0)])              # far beyond the stale threshold
+    assert len(out) == 1 and out["near"].tid == 98        # still slotted, just not as a re-ID
+
+
+def test_lunging_far_player_stays_on_the_far_half():
+    """A far player at the net projects to court_y < NET_Y_M with the usual far-court
+    depth error. Half must follow the track's history, not one frame's projected y —
+    otherwise the far pair is handed to the near pair's slots."""
+    a = SlotAssigner()
+    a.update(0, [det(1, 2.0, 3.0), det(2, 4.0, 3.0),
+                 det(3, 2.0, 10.0), det(4, 4.0, 10.0)])
+    out = a.update(1, [det(1, 2.0, 3.0), det(2, 4.0, 3.0),
+                       det(3, 2.0, 6.5), det(4, 4.0, 10.0)])   # tid 3 lunges past the net line
+    assert {out["far"].tid, out["far2"].tid} == {3, 4}, "far pair must keep its slots"
+    assert {out["near"].tid, out["near2"].tid} == {1, 2}, "near pair must not be displaced"
+
+
+def test_sustained_half_change_re_anchors():
+    """Stickiness is hysteresis, not a life sentence: a genuine change of ends (or a
+    recycled track-id) flips the half once the evidence is sustained."""
+    a = SlotAssigner()
+    a.update(0, [det(1, 2.0, 3.0)])
+    assert a.half_of_tid[1] == "near"
+    for f in range(1, HALF_FLIP_FRAMES + 1):
+        out = a.update(f, [det(1, 2.0, 10.0)])
+    assert a.half_of_tid[1] == "far"
+    assert out["far"].tid == 1 and "near" not in out
 
 
 def _p(pid, x, y):
