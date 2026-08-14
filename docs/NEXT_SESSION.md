@@ -16,6 +16,8 @@ Branch: `claude/badminton-analytics-improvements-svr9p2` · CI: green on every c
 | `f55640d` | `doubles/track.py` — slot identity fixes (gap-scaled re-ID, optimal match, sticky halves) |
 | `e488bac` | `.github/workflows/tests.yml` — both suites in CI, no video/DB/weights needed |
 | `8a9b548` | `labelfree.py` — `--from-snapshot` rebuild, deterministic side map, **all 4 snapshots regenerated** |
+| `41cf4de` | this handoff |
+| _(below)_ | `web/public/data/*/ai.json` — score layer patched from the corrected snapshots |
 
 Tests: **18/18** (`test_score_seq.py`) + **48/48** (`test_doubles.py`). Both run with no
 video, no DuckDB and no model weights — that is deliberate, keep it that way.
@@ -36,12 +38,25 @@ now fails the build instead of quietly shipping to the dashboard.
 
 ---
 
-## 2. THE ONE COMMAND THAT MATTERS
+## 2. The dashboard is already correct — but re-export anyway
 
-The corrected scores are in the snapshots but **not yet in the web bundles**
-(`web/public/data/<match>/ai.json` still has `meta.sets: [{a:19,b:17}]`). `export_web`
-reads the snapshot for scores and the DuckDB for strokes/movement/insights, so it can
-only run where the DB lives.
+The web bundles were patched directly from the corrected snapshots, so
+`web/public/data/<match>/ai.json` now carries the true scoreline and the site renders it.
+Verified by building the static export and rendering it headless: all four matches show
+the right scoreline on **both** the AI and labels toggles.
+
+That patch was a stopgap. It touched only what is a pure function of the snapshot (or of
+the snapshot plus the committed strokes):
+
+```
+rally a, b, pa, pb, winner, clutch, category, endPhrase
+meta.sets, meta.totals.points
+insights.pointsWon, insights.clutch
+```
+
+Everything DB-derived — strokes, movement, tactics, commentary — was left untouched, and
+`labels.json` and `index.json` were already correct (they come from ShuttleSet). So the
+bundles are *consistent*, not *regenerated*. Run the real export when convenient:
 
 ```bash
 cd <repo>
@@ -49,8 +64,17 @@ PYTHONPATH=src .venv/bin/python -m badminton.export_web
 cd web && npm run build
 ```
 
-`labelfree --build` is **not** needed first — the snapshots are already correct and
-committed. Run it only if you want to re-derive them (see §4).
+It should be close to a no-op on the score fields and will authoritatively refresh
+everything else. `labelfree --build` is **not** needed first — the snapshots are already
+correct and committed (see §4).
+
+### One caveat worth knowing
+
+On All England WS final, set 1 rally 29 changed **winner `B` → `A`**, not just a score
+bump. That match has 10 undetected rallies, and the rule-completion gives the game's
+final points to the last rally the segmenter *did* find. The set final is exact; that
+particular rally's attribution is approximate. Fixing it properly is the segmentation
+work in §5.1 — until then, do not quote per-rally attribution near a set's end as exact.
 
 ### Verify it worked
 
