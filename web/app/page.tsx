@@ -7,7 +7,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import GitHubLink, { GitHubMark, PROFILE_URL, REPO_URL } from "@/components/GitHubLink";
 
 /* Landing page: one pre-selected rally, already playing, with the measured numbers
-   next to it. The match picker lives at /matches — linked below the fold. */
+   next to it. The match picker lives at /matches, linked below the fold. */
 
 function readCounts(): { matches: number; rallies: number } {
   const p = path.join(process.cwd(), "public", "data");
@@ -23,7 +23,7 @@ function readCounts(): { matches: number; rallies: number } {
   };
 }
 
-/** The hero rally: All England Open 2022 SF, game 2 — a 39-shot exchange, rendered
+/** The hero rally: All England Open 2022 SF, game 2, a 39-shot exchange rendered
     by the pipeline itself (scripts/render_web_clips.py). Deep-links to the same
     rally in the film room. */
 const HERO_RALLY = "/m/all_england_2022_sf/labels/film/?r=2-6";
@@ -37,7 +37,7 @@ const METRICS: [string, string][] = [
 
 const STACK: [string, string][] = [
   ["Players", "Ultralytics YOLO11x-pose + ByteTrack, 17-keypoint pose per frame"],
-  ["Court geometry", "hand-calibrated 4-corner homography (OpenCV) — positions in true metres"],
+  ["Court geometry", "hand-calibrated 4-corner homography (OpenCV), positions in true metres"],
   ["Shuttle", "TrackNetV3, vendored unmodified and patched to run on Apple-silicon MPS"],
   ["Hits & landings", "velocity-kink / direction-reversal / serve-onset detectors over the shuttle track"],
   ["Shot types", "pretrained BST-0 (CVPRW'26) run on our own CV inputs, zero fine-tuning"],
@@ -65,8 +65,8 @@ export default function Home() {
 
       {/* ── headline ── */}
       <h1 className="rise text-[clamp(1.15rem,2.5vw,1.7rem)] font-semibold leading-[1.3] tracking-tight max-w-3xl mt-1 mb-2">
-        A computer-vision pipeline I built solo that turns broadcast badminton video into
-        per-shot match data, with no manual labelling at inference time.
+        Per-shot badminton match data, extracted from broadcast video alone with no manual
+        labelling at inference time.
       </h1>
       <p className="rise rise-1 mono text-[10.5px] tracking-[0.1em] uppercase text-dim mb-4 leading-relaxed">
         player + shuttle tracking · hit detection · shot classification · scoreboard OCR
@@ -104,7 +104,7 @@ export default function Home() {
 
         <div className="order-3 lg:col-span-8 lg:col-start-1 lg:row-start-2">
           <p className="text-mut text-[13px] leading-relaxed max-w-2xl">
-            All England Open 2022 semi-final, Lakshya Sen vs Lee Zii Jia — a 39-shot rally from
+            All England Open 2022 semi-final, Lakshya Sen vs Lee Zii Jia, a 39-shot rally from
             game 2. Nothing in this clip is hand-annotated.{" "}
             <Link href={HERO_RALLY} className="underline underline-offset-2 hover:text-ink">
               Open this rally in the dashboard →
@@ -153,35 +153,19 @@ export default function Home() {
         </Link>
       </section>
 
-      <section className="grid md:grid-cols-2 gap-x-12 gap-y-12 mb-16">
-        <div>
-          <h2 className="text-[1.15rem] font-semibold mb-4">Stack</h2>
-          <dl className="text-[13.5px] leading-relaxed">
-            {STACK.map(([k, v]) => (
-              <div key={k} className="grid grid-cols-[9.5rem_1fr] gap-3 py-1.5 border-t border-[var(--line-soft)]">
-                <dt className="mono text-[10.5px] tracking-[0.1em] uppercase text-dim pt-1">{k}</dt>
-                <dd className="text-mut">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        <div>
-          <h2 className="text-[1.15rem] font-semibold mb-4">The hardest part</h2>
-          <p className="text-mut text-[14px] leading-relaxed">
-            Rally segmentation — deciding where a rally starts and ends with no labels and no
-            clock to trust. The obvious signal, shuttle visibility, is worthless: the shuttle
-            tracker fires just as confidently on slow-motion replays as on live play, so replays
-            and warm-ups scored as rallies. What works is camera behaviour rather than shuttle
-            behaviour — a rally is a run of frames where both players hold continuous in-court
-            tracks, with bounding-box height bands self-calibrated per match to throw out
-            close-ups and zoomed replays. That left boundary errors: a player knocking the
-            shuttle back to the server looks exactly like a real contact, so one rally would
-            swallow the dead time before the next. Those split on dead-shuttle restarts — a
-            contact whose incoming shuttle velocity is near zero is a pickup, not a shot. That
-            is the 0.94 above, on a match none of it was tuned on.
-          </p>
-        </div>
+      <section className="mb-16 max-w-3xl">
+        <h2 className="text-[1.15rem] font-semibold mb-4">Stack</h2>
+        <dl className="text-[13.5px] leading-relaxed">
+          {STACK.map(([k, v]) => (
+            <div
+              key={k}
+              className="grid sm:grid-cols-[10.5rem_1fr] gap-x-4 py-2 border-t border-[var(--line-soft)]"
+            >
+              <dt className="mono text-[10.5px] tracking-[0.1em] uppercase text-dim pt-1">{k}</dt>
+              <dd className="text-mut">{v}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <footer className="pb-16">
@@ -208,8 +192,8 @@ export default function Home() {
           </a>
         </div>
         <p className="text-dim text-[12px] mono leading-relaxed">
-          YOLO11 pose · TrackNetV3 · BST-0 (CVPRW&apos;26) · template-matched score OCR —
-          validated against ShuttleSet22 human labels, including a fully held-out match.
+          YOLO11 pose · TrackNetV3 · BST-0 (CVPRW&apos;26) · template-matched score OCR.
+          Validated against ShuttleSet22 human labels, including a fully held-out match.
         </p>
       </footer>
     </main>
