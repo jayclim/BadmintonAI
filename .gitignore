@@ -24,6 +24,8 @@ third_party/
 *.part
 # …but the web app's annotated rally clips ship with the site (Vercel builds from git)
 !web/public/clips/**/*.mp4
+# …as does the landing page's hero rally (a trimmed, re-compressed clip)
+!web/public/hero/*.mp4
 
 # Model weights (auto-downloaded by ultralytics)
 *.pt

@@ -6,6 +6,20 @@ an **AI Lab** that shows every CV pipeline stage working, with measured validati
 Each match renders from two data sources — **GROUND TRUTH** (ShuttleSet labels) and
 **AI VISION** (the fully label-free chain) — switchable from the top bar.
 
+## Routes
+
+- `/` — landing page: one pre-selected rally autoplaying with the CV overlays baked in
+  (`public/hero/rally.mp4`, a trimmed re-compression of the annotated clip for
+  all_england_2022_sf set 2 rally 6), the held-out validation numbers beside it, and the
+  stack / hardest-problem write-up below the fold.
+- `/matches/` — the match picker (this used to be `/`).
+- `/m/<id>/<labels|ai>/<view>/` — singles dashboard · `/d/<id>/<view>/` — doubles.
+
+To replace the hero clip, trim any file under `public/clips/` and re-encode, e.g.
+`ffmpeg -ss <t> -t 12.5 -i <clip> -c:v libx264 -crf 30 -preset veryslow -an -movflags +faststart
+public/hero/rally.mp4`, then refresh the poster with `-ss 4 -frames:v 1 -q:v 6 public/hero/rally.jpg`.
+Note the root `.gitignore` un-ignores `web/public/hero/*.mp4`.
+
 ## How it works
 
 - Pure static export (`output: 'export'`) — no server, no Python at runtime.
