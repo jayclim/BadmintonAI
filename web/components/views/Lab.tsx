@@ -69,7 +69,7 @@ export default function Lab({ d, id, src }: ViewProps) {
       <section>
         <Section
           kicker="THE LABEL-FREE CHAIN"
-          title="From raw broadcast to scouting report"
+          title="Pipeline stages"
           hint={
             sc?.heldOut
               ? "Every threshold in this chain was tuned on the India Open match — this match is fully held out, so the numbers below are out-of-distribution performance."
@@ -109,8 +109,8 @@ export default function Lab({ d, id, src }: ViewProps) {
       {/* rally x-ray */}
       <section>
         <Section
-          kicker="ONE RALLY, EVERY MODEL"
-          title="Rally X-ray"
+          kicker="ONE RALLY"
+          title="Rally breakdown"
           hint="One rally, synchronized views: the broadcast, the machine-tracked court, and the raw shuttle trajectory with every detected contact. Yellow = machine; dashed gray = human label, where one exists."
         />
         <div className="max-w-xs mb-3">
@@ -216,7 +216,7 @@ export default function Lab({ d, id, src }: ViewProps) {
         <section>
           <Section
             kicker="AI VS HUMAN LABELS"
-            title="How close does the AI get?"
+            title="AI accuracy vs human labels"
             hint="The label-free pipeline's strokes matched to ShuttleSet's human annotations (±6 frames). This is the exact gap between the GROUND TRUTH and AI VISION toggles."
           />
           <div className="grid sm:grid-cols-4 gap-3 mb-4">

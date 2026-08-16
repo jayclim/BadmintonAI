@@ -15,9 +15,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "COURTSIDE — badminton match intelligence",
+  title: "COURTSIDE: badminton match analytics",
   description:
-    "Coach-grade badminton match analytics from raw broadcast video — player tracking, shuttle tracking, shot classification and score OCR, with a fully label-free AI mode.",
+    "Badminton match analytics from broadcast video: player tracking, shuttle tracking, shot classification and score OCR, with a fully label-free AI mode.",
 };
 
 export default function RootLayout({

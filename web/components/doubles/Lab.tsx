@@ -149,8 +149,8 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
 
       <section>
         <Section
-          kicker="ONE RALLY, WHAT THE MACHINE SEES"
-          title="Rally x-ray"
+          kicker="ONE RALLY"
+          title="Rally breakdown"
           hint="The same rally two ways: the AI-annotated broadcast (4-player pose, names, roles, formation and the machine-read score baked in) beside the 2D reconstruction in true court metres. Front player solid, rear ringed. No labels were used to produce any of it."
         />
         <div className="max-w-xs mb-3">

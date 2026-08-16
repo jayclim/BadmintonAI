@@ -1,23 +1,23 @@
-# COURTSIDE — badminton match intelligence from raw broadcast video
+# COURTSIDE: badminton match analytics from broadcast video
 
-**An end-to-end computer-vision system that watches a badminton broadcast and writes the
-scouting report.** It tracks both players and the shuttle, detects every hit, classifies
-every shot, reads the scoreboard, segments rallies — then turns that into a coach-grade
-analytics dashboard with AI-annotated video for every rally. **No human labels at
-inference time**, and every stage is validated against professionally annotated ground
-truth, including on a fully held-out match.
+An end-to-end computer-vision pipeline that turns a badminton broadcast into per-shot match
+data. It tracks both players and the shuttle, detects every hit, classifies every shot,
+reads the scoreboard and segments rallies, then serves the result as an analytics dashboard
+with an annotated clip for every rally. No human labels at inference time, and every stage
+is scored against ShuttleSet22 annotations including on a held-out match.
 
-![COURTSIDE overview — label-free AI mode](docs/img/web_overview.jpg)
+**Live: [badminton.jaydenclim.com](https://badminton.jaydenclim.com)**
 
-> Everything on that page — the score worm, the stats, the coach's notes — was inferred
-> from pixels. Flip the same dashboard to **GROUND TRUTH** (human labels) to compare; the
-> gap between the two is measured and published on the AI Lab page.
+![COURTSIDE overview, label-free AI mode](docs/img/web_overview.jpg)
+
+> The dashboard in label-free mode. The same views flip to **GROUND TRUTH** (human labels);
+> the AI Lab page publishes the measured gap between the two.
 
 ## Pipeline accuracy
 
 Thresholds were tuned on one match (India Open 2022 final) and tested untouched on a
-second (Denmark Open 2022 SF) — the held-out column is true out-of-distribution
-performance. Ground truth: ShuttleSet22 human annotations.
+second (Denmark Open 2022 SF), so the held-out column is out-of-distribution performance.
+Ground truth: ShuttleSet22 human annotations.
 
 | Stage | Method | Tuned match | Held-out match |
 |---|---|---|---|
@@ -32,65 +32,60 @@ performance. Ground truth: ShuttleSet22 human annotations.
 | Per-set side mapping | "winner serves next" voting | **4/4** sets | 4/4 sets |
 
 End-to-end, the label-free chain reproduces 84.5% / 79.5% of labeled strokes with ~96%
-hitter agreement — enough that the *same* analytics code produces near-identical coach
-insights from either source.
+hitter agreement, so the same analytics code produces near-identical output from either
+source.
 
-## What the dashboard does with it
+## Dashboard
 
-Static Next.js app in [`web/`](web/) (TypeScript, Tailwind, bespoke SVG charts — no chart
+Static Next.js app in [`web/`](web/) (TypeScript, Tailwind, hand-built SVG charts, no chart
 library; deploys to Vercel as pure static files):
 
-- **Overview** — interactive score worm, stat duel, auto-generated *coach's notes* where
+- **Overview:** score progression, player comparison, auto-generated coach's notes where
   every claim deep-links to its evidence rallies, plus an LLM-written match report.
-- **Points / Court / Patterns** — winners and errors by shot, rally-length win rates, serve & receive,
-  shot placement maps, movement heatmaps (side-swap corrected), pressure model
-  (required movement speed), forced/unforced errors, and two scouting tables:
-  the **response matrix** ("vs a net shot he lifts 52% — and wins only 41% of those")
-  and the **opening playbook** (serve type → hold % → returns → server win % vs each).
-- **Film room** — every rally filterable and watchable, with a synchronized **2D replay**
+- **Points / Court / Patterns:** winners and errors by shot, rally-length win rates, serve
+  and receive, shot placement maps, movement heatmaps (side-swap corrected), a pressure
+  model (required movement speed), forced vs unforced errors, and two scouting tables: the
+  response matrix (what a player does against each incoming shot, and how often it works)
+  and the opening playbook (serve type → hold % → returns → server win % vs each).
+- **Film room:** every rally filterable and watchable, with a synchronized 2D replay
   animated from the CV tracks and a per-shot pressure strip.
-- **AI overlay everywhere** — a persistent navbar toggle swaps all footage to
-  pre-rendered annotated clips: pose skeletons, shuttle trail, BST shot calls with
-  confidence, and the machine-read score, baked into the video.
-- **AI Lab** — each pipeline stage with its measured accuracy, a rally
-  "X-ray" (broadcast + 2D replay + raw shuttle trajectory with detected vs labeled hits),
-  live score-OCR crops, and the BST-vs-labels confusion matrix.
+- **AI overlay:** a navbar toggle swaps all footage to pre-rendered annotated clips with
+  pose skeletons, shuttle trail, shot calls with confidence, and the machine-read score
+  baked into the video.
+- **AI Lab:** every pipeline stage with its measured accuracy, a per-rally breakdown
+  (broadcast + 2D replay + raw shuttle trajectory with detected vs labeled hits), live
+  score-OCR crops, and the shot-classification confusion matrix.
 
-![AI Lab — agreement vs human labels](docs/img/web_lab.jpg)
-![Film room — AI-annotated rally clip](docs/img/web_film.jpg)
+![AI Lab, agreement vs human labels](docs/img/web_lab.jpg)
+![Film room, AI-annotated rally clip](docs/img/web_film.jpg)
 
 ## Doubles
 
-Doubles is a separate, deletable surface (route `/d/<id>`, its own manifest and
-components) so the singles chain stays untouched. There are no public doubles stroke
-labels and identical kit defeats appearance re-ID, so the doubles pipeline leans on
-**geometry and roles** instead of strokes: it tracks all four players (top-2 per court half,
-stable identity slots), then derives — purely from the tracks — **formation** (attack =
-front/back stack vs defence = side-by-side), **rotations**, per-player **net-hunting**,
-**movement** heatmaps, and **label-free validation** (≈93% all-4 in-rally
-coverage, identity stability, OCR parity). Five COURTSIDE views: Overview (+ rule-based
-scouting notes), Court, Patterns (formation flow), Film room (4-player 2D replay), AI Lab.
+A separate, deletable surface (route `/d/<id>`, its own manifest and components) so the
+singles chain stays untouched. There are no public doubles stroke labels and identical kit
+defeats appearance re-ID, so this pipeline works from **geometry and roles** rather than
+strokes: all four players tracked (top-2 per court half, stable identity slots), and from
+the tracks alone, formation (attack = front/back stack vs defence = side-by-side),
+rotations, net-hunting, movement heatmaps and label-free validation (≈93% all-4 in-rally
+coverage). Set boundaries come from the scoreboard OCR and the pairs' end-swaps between
+games are handled deterministically, so every stat aggregates per **team** across a full
+multi-set match.
 
-The whole broadcast is tracked end to end, so the dashboard covers the **full multi-set
-match**: set boundaries are read from the scoreboard OCR and the pairs' end-swaps between
-games (and the deciding-game change at 11) are handled deterministically, so every stat
-aggregates per **team** across all three sets. Runbook + design:
-[`docs/DOUBLES.md`](docs/DOUBLES.md).
-
-> Still gated on stroke-level data: shot mix, response matrix, openings, error pressure —
-> these need 4-slot hit attribution (a Phase-1 item), not faked.
+Five views: Overview, Court, Patterns, Film room, AI Lab. Shot mix, response matrix,
+openings and error pressure need 4-slot hit attribution and are not built yet. Runbook and
+design: [`docs/DOUBLES.md`](docs/DOUBLES.md).
 
 ## Run it
 
-**Web dashboard** (all data + clips are committed — runs from a fresh clone):
+**Web dashboard.** All data and clips are committed, so it runs from a fresh clone:
 
 ```bash
 cd web && npm install && npm run dev     # http://localhost:3000
-npm run build                            # static site in web/out — Vercel: root dir = web
+npm run build                            # static site in web/out (Vercel: root dir = web)
 ```
 
-**Python pipeline / Streamlit lab** (needs the local DuckDB + match video — see the
-runbook below to build them):
+**Python pipeline / Streamlit lab.** Needs the local DuckDB and match video, built by the
+runbook below:
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -98,9 +93,8 @@ PYTHONPATH=src .venv/bin/streamlit run app.py        # internal CV-diagnostics d
 PYTHONPATH=src .venv/bin/python -m badminton.<module>  # any pipeline stage as a CLI
 ```
 
-**Add a match (data injection)** — the full runbook with both paths is
-[`docs/ADD_A_MATCH.md`](docs/ADD_A_MATCH.md). The short version, for any broadcast video
-with no labels:
+**Add a match.** Full runbook in [`docs/ADD_A_MATCH.md`](docs/ADD_A_MATCH.md). The short
+version, for any broadcast video with no labels:
 
 ```bash
 # register in config/matches.yaml, fetch 720p video, calibrate 4 court corners, then:
@@ -112,8 +106,8 @@ PYTHONPATH=src .venv/bin/python scripts/render_web_clips.py --match <id>  # AI c
 PYTHONPATH=src .venv/bin/python -m badminton.export_web                   # → web/public/data
 ```
 
-Parsed data is durable (DuckDB, keyed by `match_id`) — every stage runs once and is
-cached forever.
+Parsed data is durable (DuckDB, keyed by `match_id`), so every stage runs once and is
+cached from then on.
 
 ## How it's built
 
@@ -134,47 +128,40 @@ broadcast.mp4 ──► YOLO11 pose + ByteTrack ──► tracks (court metres, 
 ```
 
 The core design decision: **ShuttleSet's annotation format is the system's Tier-1
-schema.** The CV pipeline's job is defined as *reproducing the human annotators' table* —
-which gives free per-stage validation, and means the entire analytics layer was built and
+schema.** The CV pipeline's job is defined as *reproducing the human annotators' table*,
+which gives free per-stage validation and let the entire analytics layer be built and
 debugged on ground truth before the vision pipeline existed.
 
-- **Storage** — DuckDB, two tiers: `strokes` (one row per shot, superset of ShuttleSet) and
+- **Storage:** DuckDB, two tiers. `strokes` (one row per shot, superset of ShuttleSet) and
   `tracks`/`shuttle` (per-frame). One writer or many readers; writers batch at the end.
-- **Stack** — Python 3.12 / PyTorch on Apple-silicon MPS, ultralytics, DuckDB, pandas,
+- **Stack:** Python 3.12 / PyTorch on Apple-silicon MPS, ultralytics, DuckDB, pandas,
   scikit-learn, OpenCV · Next.js 16 / TypeScript / Tailwind 4 · Gemini or Claude for the
   commentary layer (cached JSON, pluggable provider).
-- **Video strategy** — analyzed videos are the official BWF YouTube uploads, so the web app
+- **Video strategy:** analyzed videos are the official BWF YouTube uploads, so the web app
   embeds them at frame-accurate timestamps (zero hosting); the AI-annotated clips are
   rendered locally at 540p (~0.7 MB/rally) and shipped with the site.
 
-## Credits / Prior Work
+## Credits
 
-COURTSIDE builds on four pretrained third-party models, used **without fine-tuning**:
+Four pretrained third-party models, used without fine-tuning:
 [Ultralytics YOLO11-Pose](https://github.com/ultralytics/ultralytics) (player pose),
 [ByteTrack](https://arxiv.org/abs/2110.06864) (identity, via Ultralytics' bundled tracker),
-[TrackNetV3](https://github.com/qaz812345/TrackNetV3) (shuttle trajectory — vendored and run
+[TrackNetV3](https://github.com/qaz812345/TrackNetV3) (shuttle trajectory, vendored and run
 unmodified), and [BST-0](https://arxiv.org/abs/2502.21085) (*Badminton Stroke-type
-Transformer*, Chang, CVPRW 2026). Ground truth and the Tier-1 data schema come from the
-[ShuttleSet / ShuttleSet22](https://github.com/wywyWang/CoachAI-Projects) human annotations.
-The runtime stack is PyTorch (Apple-silicon MPS), OpenCV, DuckDB, pandas, and scikit-learn,
-with a static Next.js 16 / Tailwind front end (charts are hand-built SVG, no charting library).
+Transformer*, Chang, CVPRW 2026). Ground truth and the Tier-1 schema come from the
+[ShuttleSet / ShuttleSet22](https://github.com/wywyWang/CoachAI-Projects) annotations.
 
-Everything connecting those models is original work: the hit-detection, landing-estimation,
-rally-segmentation, score-OCR, side-mapping, analytics, and dashboard stages, plus the
-homography calibration, foot-point heuristic, MPS shims for the vendored models, the BST input
-adapter, and the validation harness that scores each stage against ShuttleSet. Reported
-accuracies split accordingly — player tracking (0.57 m) is third-party detection through my
-court mapping; shot classification (72–83%) is BST-0's accuracy on my pipeline's inputs; hit
-detection (F1 87.9), landings (0.55 m), rally segmentation (F1 97.6), and score OCR (95.2%)
-are produced by original code.
+Everything between those models lives in this repo: hit detection, landing estimation,
+rally segmentation, score OCR and decoding, side mapping, the analytics and dashboard
+layers, homography calibration and the foot-point heuristic, MPS shims for the vendored
+models, the BST input adapter, and the validation harness. The method column in the
+accuracy table says which of the two produced each number.
 
 ### Licenses
 
-COURTSIDE's own code is [MIT](LICENSE). Third-party models, data, and libraries keep their own
-licenses — see [`LICENSES/README.md`](LICENSES/README.md) for the obligations before
-redistributing anything or deploying the pipeline as a network service.
-
-**Pretrained models & data** (all used without fine-tuning):
+COURTSIDE's own code is [MIT](LICENSE). Third-party models, data and libraries keep their
+own licenses. Read [`LICENSES/README.md`](LICENSES/README.md) before redistributing
+anything or deploying the pipeline as a network service.
 
 | Component | Role | License |
 |---|---|---|
@@ -182,26 +169,11 @@ redistributing anything or deploying the pipeline as a network service.
 | [ByteTrack](https://github.com/ifzhang/ByteTrack) | player identity across frames | [MIT](https://github.com/ifzhang/ByteTrack/blob/main/LICENSE) upstream; the implementation actually run is Ultralytics' bundled tracker, so it ships under AGPL-3.0 |
 | [TrackNetV3](https://github.com/qaz812345/TrackNetV3) | shuttle trajectory | [MIT](third_party/TrackNetV3/LICENSE) (vendored, unmodified) |
 | [BST-0](https://github.com/Va6lue/BST-Badminton-Stroke-type-Transformer) ([paper](https://arxiv.org/abs/2502.21085)) | stroke-type classification | [MIT](third_party/BST/LICENSE) (vendored) |
-| [ShuttleSet / ShuttleSet22](https://github.com/wywyWang/CoachAI-Projects) | ground-truth annotations, Tier-1 schema | [MIT](https://github.com/wywyWang/CoachAI-Projects/blob/main/LICENSE) — cite the ShuttleSet paper in published results |
+| [ShuttleSet / ShuttleSet22](https://github.com/wywyWang/CoachAI-Projects) | ground-truth annotations, Tier-1 schema | [MIT](https://github.com/wywyWang/CoachAI-Projects/blob/main/LICENSE), cite the ShuttleSet paper in published results |
 
-**Libraries** (Python pipeline):
-
-| Library | License |
-|---|---|
-| [PyTorch](https://pytorch.org/) | [BSD-3-Clause](https://github.com/pytorch/pytorch/blob/main/LICENSE) |
-| [OpenCV](https://opencv.org/) (`opencv-python`) | [Apache-2.0](https://opencv.org/license/) |
-| [NumPy](https://numpy.org/) · [SciPy](https://scipy.org/) · [pandas](https://pandas.pydata.org/) · [scikit-learn](https://scikit-learn.org/) · [Altair](https://altair-viz.github.io/) | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [DuckDB](https://duckdb.org/) · [PyYAML](https://pyyaml.org/) · [pydantic](https://docs.pydantic.dev/) · [anthropic](https://github.com/anthropics/anthropic-sdk-python) · [gdown](https://github.com/wkentaro/gdown) · [parse](https://github.com/r1chardj0n3s/parse) · [positional-encodings](https://github.com/tatp22/multidim-positional-encoding) · [torchinfo](https://github.com/TylerYep/torchinfo) | [MIT](https://spdx.org/licenses/MIT.html) |
-| [Streamlit](https://streamlit.io/) · [Requests](https://requests.readthedocs.io/) | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [matplotlib](https://matplotlib.org/) | [PSF-based matplotlib license](https://matplotlib.org/stable/project/license.html) |
-| [pycocotools](https://github.com/ppwwyyxx/cocoapi) | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | [Unlicense](https://spdx.org/licenses/Unlicense.html) |
-
-**Libraries** (web dashboard): [Next.js](https://nextjs.org/), [React](https://react.dev/), and
-[Tailwind CSS](https://tailwindcss.com/) are [MIT](https://spdx.org/licenses/MIT.html);
-[TypeScript](https://www.typescriptlang.org/) is
-[Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) (plus MIT-licensed dev tooling:
-`@types/*`, `@tailwindcss/postcss`).
+Runtime libraries are standard permissive (PyTorch BSD-3, OpenCV Apache-2.0, DuckDB MIT,
+pandas / NumPy / scikit-learn BSD, Next.js / React / Tailwind MIT), itemized in
+[`LICENSES/README.md`](LICENSES/README.md).
 
 ## Docs
 

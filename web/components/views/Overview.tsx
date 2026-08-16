@@ -20,7 +20,7 @@ export default function Overview({ d, src, goFilm, goRally }: ViewProps) {
       <section>
         <Section
           kicker="SCORE FLOW"
-          title="Who led, point by point"
+          title="Score progression"
           hint="Step line = the point lead. ◆ = clutch points (either player at 18+). Hover a point for details; click to watch the rally."
         />
         <div className="grid lg:grid-cols-2 gap-4">

@@ -228,7 +228,7 @@ export default function DoublesPoints({ d, goRally }: DoublesViewProps) {
     <div className="space-y-8 mt-2">
       <section>
         <Section
-          kicker="THE SCORE STORY"
+          kicker="SCORE FLOW"
           title="How each game was won"
           hint="The lead, point by point, read off the broadcast scoreboard. Above the centre line one team leads; below, the other. Each dot is a point — click to watch that rally."
         />

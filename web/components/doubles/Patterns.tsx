@@ -154,7 +154,7 @@ export default function DoublesPatterns({ d, goRally }: DoublesViewProps) {
           <section>
             <Section
               kicker="RESPONSE MATRIX"
-              title="How each pair answers"
+              title="Response tendencies"
               hint="Given the opponent's last shot (left), the shots this pair replies with most. The doubles read: who blocks vs counter-drives a smash, who lifts vs spins back at the net."
             />
             <div className="grid md:grid-cols-2 gap-5">
