@@ -284,7 +284,7 @@ export default function DoublesPoints({ d, goRally }: DoublesViewProps) {
         </Card>
 
         <Card>
-          <Section kicker="POINT LENGTH" title="Who wins short vs long" hint="Points won, split by rally duration — long-rally wins point to endurance, short-rally wins to fast starts." />
+          <Section kicker="POINT LENGTH" title="Win rate by rally length" hint="Points won, split by rally duration — long-rally wins point to endurance, short-rally wins to fast starts." />
           <LengthBars lengthWins={p.lengthWins} names={meta.teams} />
         </Card>
       </section>

@@ -18,7 +18,7 @@ function CoachNotes({ notes }: { notes: CoachNote[] }) {
     <section>
       <Section
         kicker="AI SCOUTING NOTES"
-        title="What the tracking says"
+        title="Scouting notes"
         hint="Rule-based reads off the formation, role and movement tactics — no labels, no LLM. Each note is a measured tendency a coach would act on."
       />
       <div className="grid sm:grid-cols-2 gap-3">
@@ -142,7 +142,7 @@ function ControlSection({ d, goRally }: { d: DoublesMatch; goRally: (rally: numb
     <section>
       <Section
         kicker="COURT CONTROL"
-        title="Who owns the court"
+        title="Court control"
         hint="Voronoi dominant region — each court point belongs to the team whose nearer player is closer; >50% means a pair commands more than its own half (a sign of attacking). A small static far-side bias sits under the raw share, so the most one-sided rallies are ranked by deviation from the match baseline."
       />
       <div className="grid md:grid-cols-2 gap-5">
@@ -278,7 +278,7 @@ export default function DoublesOverview({ d, goRally }: DoublesViewProps) {
         <section>
           <Section
             kicker="ROLES"
-            title="Who plays the net"
+            title="Net presence"
             hint={`Share of in-rally frames each player spent as the front (net) player of their pair${multiSet ? " — computed for the roster-named set(s)" : ""}. The net player attacks; their partner covers the rear.`}
           />
           <div className="grid md:grid-cols-2 gap-5">

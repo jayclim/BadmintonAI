@@ -100,7 +100,7 @@ export default function DoublesMovement({ d }: DoublesViewProps) {
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <Section
             kicker="FROM THE CV TRACKS — PER PLAYER, PER SET"
-            title="Who covered what"
+            title="Coverage by player"
             hint="Each player's court coverage over the set's rallies, plotted on one near half (net at the top, far side mirrored) so all four compare directly. NET / MID / REAR is where they lived; coverage is the area roamed. TOP SHOTS attribute each CV contact to the nearer partner — the side is exact, the within-pair split approximate."
           />
           {sets.length > 1 && (

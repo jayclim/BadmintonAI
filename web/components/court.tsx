@@ -135,9 +135,15 @@ export function PlacementMap({
               )}
             </g>
           ))}
+        {/* the hitter is normalized to the near end, which CourtLines draws at the
+            TOP (small y), so shots travel down the map into the far half */}
+        <text x={(W / 2) * K} y={-0.45 * K} textAnchor="middle"
+          fontSize={11} fill="var(--dim)" className="mono">
+          ↑ HITTING FROM HERE
+        </text>
         <text x={(W / 2) * K} y={(L + 1.0) * K} textAnchor="middle"
           fontSize={11} fill="var(--dim)" className="mono">
-          HITTING FROM HERE ↑
+          OPPONENT&apos;S HALF ↓
         </text>
       </svg>
       {tipEl}

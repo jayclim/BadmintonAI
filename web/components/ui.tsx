@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import Link from "next/link";
 import type { P } from "@/lib/types";
 import { PCOLOR } from "@/lib/fmt";
 
@@ -220,4 +221,44 @@ export function useChartTip() {
     </Tip>
   ) : null;
   return { ref, on, tipEl };
+}
+
+/** Bottom-of-page pager that walks a first-time visitor through the views in order.
+    Shared by the singles and doubles dashboards; `steps` is [href, label] in order,
+    bookended by whatever the caller wants before the first and after the last view. */
+export function ViewPager({
+  steps,
+  current,
+}: {
+  steps: [string, string][];
+  current: number;
+}) {
+  const prev = current > 0 ? steps[current - 1] : null;
+  const next = current < steps.length - 1 ? steps[current + 1] : null;
+  const cell =
+    "card px-4 py-3 flex items-center gap-3 hover:border-[var(--mut)] transition-colors group min-w-0";
+  return (
+    <nav className="mt-14 pt-6 border-t border-[var(--line-soft)] grid sm:grid-cols-2 gap-3">
+      {prev ? (
+        <Link href={prev[0]} className={cell}>
+          <span className="text-dim group-hover:text-ink transition-colors">←</span>
+          <span className="min-w-0">
+            <span className="kicker block">BACK</span>
+            <span className="text-[14px] font-semibold truncate block">{prev[1]}</span>
+          </span>
+        </Link>
+      ) : (
+        <span />
+      )}
+      {next && (
+        <Link href={next[0]} className={`${cell} sm:justify-end sm:text-right`}>
+          <span className="min-w-0 sm:order-1">
+            <span className="kicker block">NEXT</span>
+            <span className="text-[14px] font-semibold truncate block">{next[1]}</span>
+          </span>
+          <span className="text-dim group-hover:text-ink transition-colors sm:order-2">→</span>
+        </Link>
+      )}
+    </nav>
+  );
 }

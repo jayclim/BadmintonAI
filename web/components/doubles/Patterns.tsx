@@ -141,7 +141,7 @@ export default function DoublesPatterns({ d, goRally }: DoublesViewProps) {
           <section>
             <Section
               kicker="SHOT SELECTION"
-              title="What each pair hits"
+              title="Shot mix by pair"
               hint="Shot mix per pair from CV-detected contacts (img-y extrema on the tracked shuttle), kept per fixed team across the end-swaps. Shot TYPES are a geometry baseline transferred from the labelled singles matches — unvalidated on doubles (no doubles labels exist), so read the distribution, not any single call."
             />
             <div className="grid md:grid-cols-2 gap-5">
@@ -169,7 +169,7 @@ export default function DoublesPatterns({ d, goRally }: DoublesViewProps) {
       <section>
         <Section
           kicker="FORMATION FLOW"
-          title="Who controls the attack"
+          title="Attack share"
           hint="Doubles is won by holding the attacking (front/back) formation and forcing the other pair into defence (side-by-side). Attack-first = seized the offence at the rally start; hold = how long the attack lasted before the pair was rotated back; rotation rate = formation flips per minute."
         />
         <div className="grid md:grid-cols-2 gap-5">

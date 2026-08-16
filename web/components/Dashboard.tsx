@@ -13,6 +13,7 @@ import Patterns from "@/components/views/Patterns";
 import Film from "@/components/views/Film";
 import Lab from "@/components/views/Lab";
 import ThemeToggle from "@/components/ThemeToggle";
+import { ViewPager } from "@/components/ui";
 
 const TABS: [string, string][] = [
   ["overview", "Overview"],
@@ -49,6 +50,14 @@ export default function Dashboard({ id, src, view }: { id: string; src: Source; 
   const goRally = (set: number, rally: number) => {
     router.push(`/m/${id}/${src}/film/?r=${set}-${rally}`);
   };
+
+  /* Ordered walk-through for a first-time visitor: home → the six views → the picker. */
+  const steps: [string, string][] = [
+    ["/", "Home"],
+    ...TABS.map(([v, label]) => [`/m/${id}/${src}/${v}/`, label] as [string, string]),
+    ["/matches/", "Explore other matches"],
+  ];
+  const stepIx = TABS.findIndex(([v]) => v === view) + 1;
 
   return (
     <main className="max-w-[1400px] mx-auto px-5 pb-20 w-full">
@@ -152,6 +161,7 @@ export default function Dashboard({ id, src, view }: { id: string; src: Source; 
           {view === "patterns" && <Patterns d={d} id={id} src={src} goFilm={goFilm} goRally={goRally} />}
           {view === "film" && <Film d={d} id={id} src={src} goFilm={goFilm} goRally={goRally} />}
           {view === "lab" && <Lab d={d} id={id} src={src} goFilm={goFilm} goRally={goRally} />}
+          <ViewPager steps={steps} current={stepIx < 0 ? 0 : stepIx} />
         </>
       )}
     </main>

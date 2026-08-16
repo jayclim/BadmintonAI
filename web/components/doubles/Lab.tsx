@@ -71,7 +71,7 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
       <section>
         <Section
           kicker="THE LABEL-FREE DOUBLES CHAIN"
-          title="Validated without a single label"
+          title="Label-free validation"
           hint="No public doubles dataset exists and the one SOTA paper hand-annotated just two matches — so this pipeline trains on nothing. Every stage is checked on its own terms: tracking coverage, identity stability and rally segmentation, all measured straight from the tracks."
         >
           <AiTag text="VALIDATION" />
@@ -100,7 +100,7 @@ export default function DoublesLab({ d, id }: DoublesViewProps) {
       <section>
         <Section
           kicker="PER-PLAYER TRACKING QUALITY"
-          title="Where the tracker is strong (and where it slips)"
+          title="Tracking quality by player"
           hint="Recall = share of rally frames each slot was tracked — the far pair is smaller and more occluded, so it trails. Median step is the typical per-frame court move (low = smooth). ID jumps are non-physical >1.5 m hops between adjacent frames — the identity-switch failure mode the doubles literature flags."
         />
         <Card className="!p-0 overflow-hidden">

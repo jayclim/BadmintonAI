@@ -44,7 +44,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
         <Section
           kicker="SHOT PLACEMENT"
           title="Where their shots land"
-          hint="Each player shown hitting upward into the opponent's half (sides normalized across sets). ★ winners · ✕ rally-ending errors · dots = everything else. Hover a mark for details; click to watch the rally."
+          hint="Where each player's shots came down, with both players normalized to hit from the top half into the opponent's half at the bottom (sides are swapped across sets). ★ winners · ✕ rally-ending errors · dots = everything else. Hover a mark for details; click to watch the rally."
         >
           {src === "ai" && <AiTag text="CV LANDINGS" />}
         </Section>
@@ -81,7 +81,8 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
             <div className="kicker mb-2">READING THE MAPS</div>
             <ul className="text-[13px] text-mut space-y-2 leading-snug">
               <li>· A tight ★ cluster is a go-to finishing zone.</li>
-              <li>· ✕ beyond the far baseline or outside the lines = hit long / wide; ✕ just below the net line = netted.</li>
+              <li>· ✕ past the far baseline or outside the lines = hit long / wide; ✕ just above the net = netted, since a netted shot drops on the hitter&apos;s own side.</li>
+              <li>· A handful of marks land in the hitter&apos;s own half. Most are netted shots; on the AI source some are landing-estimate error, the pipeline&apos;s least accurate stage.</li>
               <li>· Filter to one shot (e.g. smash) and compare the two maps for placement variety.</li>
               <li>· Click any mark to watch that rally.</li>
             </ul>
@@ -94,7 +95,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
       <section>
         <Section
           kicker="FROM THE CV TRACKS — VALIDATED ±0.57 m"
-          title="Who did the running"
+          title="Movement and court coverage"
           hint="Per-player movement, correctly re-attributed each set as players swap ends. Heat shown on each player's own half, net at the top. Recovery = average distance from the ideal base — lower is better discipline."
         />
         <div className="grid md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.9fr] gap-4 [&>*]:min-w-0">
@@ -139,7 +140,7 @@ export default function CourtView({ d, src, goRally }: ViewProps) {
           <Card delay={3} className="self-start">
             <Section
               kicker="PRESSURE BUILDERS"
-              title="Shots that make the opponent scramble"
+              title="Pressure applied by shot type"
               hint="Average speed the opponent needed to reach the next shot — pressure even when it doesn't end the point."
             />
             <HBars

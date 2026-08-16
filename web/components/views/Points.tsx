@@ -76,13 +76,13 @@ export default function Points({ d, goFilm }: ViewProps) {
         <Card className="lg:col-span-3">
           <Section
             kicker="RALLY LENGTH"
-            title="Who wins the long rallies?"
+            title="Win rate by rally length"
             hint="Win rate by rally length. A big gap suggests shortening or extending rallies on purpose."
           />
           <LengthCols rows={insights.lengthBuckets} names={names} />
         </Card>
         <Card className="lg:col-span-2">
-          <Section kicker="POINT SOURCES" title="Where the points came from" />
+          <Section kicker="POINT SOURCES" title="How points were won" />
           <div className="space-y-5">
             {(["B", "A"] as P[]).map((p) => (
               <div key={p}>

@@ -6,7 +6,7 @@ import { useDoublesMatch } from "@/lib/doubles";
 import type { DoublesMatch } from "@/lib/doubles";
 import { fmtClock } from "@/lib/fmt";
 import { useOverlayPref } from "@/lib/overlay";
-import { AiTag } from "@/components/ui";
+import { AiTag, ViewPager } from "@/components/ui";
 import ThemeToggle from "@/components/ThemeToggle";
 import DoublesOverview from "@/components/doubles/Overview";
 import DoublesPoints from "@/components/doubles/Points";
@@ -35,6 +35,14 @@ export default function DoublesDashboard({ id, view }: { id: string; view: strin
   const router = useRouter();
   const [overlayOn, setOverlayOn] = useOverlayPref();
   const goRally = (rally: number) => router.push(`/d/${id}/film/?r=${rally}`);
+
+  /* Ordered walk-through for a first-time visitor: home → the six views → the picker. */
+  const steps: [string, string][] = [
+    ["/", "Home"],
+    ...TABS.map(([v, label]) => [`/d/${id}/${v}/`, label] as [string, string]),
+    ["/matches/", "Explore other matches"],
+  ];
+  const stepIx = TABS.findIndex(([v]) => v === view) + 1;
 
   return (
     <main className="max-w-[1400px] mx-auto px-5 pb-20 w-full">
@@ -107,6 +115,7 @@ export default function DoublesDashboard({ id, view }: { id: string; view: strin
           {view === "patterns" && <DoublesPatterns d={d} id={id} goRally={goRally} />}
           {view === "film" && <DoublesFilm d={d} id={id} goRally={goRally} />}
           {view === "lab" && <DoublesLab d={d} id={id} goRally={goRally} />}
+          <ViewPager steps={steps} current={stepIx < 0 ? 0 : stepIx} />
         </>
       )}
     </main>
