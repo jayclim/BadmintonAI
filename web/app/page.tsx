@@ -24,9 +24,20 @@ function readCounts(): { matches: number; rallies: number } {
 }
 
 /** The hero rally: All England Open 2022 SF, game 2, a 39-shot exchange rendered
-    by the pipeline itself (scripts/render_web_clips.py). Deep-links to the same
-    rally in the film room. */
-const HERO_RALLY = "/m/all_england_2022_sf/labels/film/?r=2-6";
+    by the pipeline itself (scripts/render_web_clips.py). The full analysis opens on
+    the label-free source, the one the hero clip was rendered from; the rally link
+    stays on `labels`, whose rally numbering matches the clip. */
+const HERO_MATCH = "all_england_2022_sf";
+const HERO_ANALYSIS = `/m/${HERO_MATCH}/ai/overview/`;
+const HERO_RALLY = `/m/${HERO_MATCH}/labels/film/?r=2-6`;
+
+const HERO_VIEWS: [string, string][] = [
+  ["points", "Points"],
+  ["court", "Court maps"],
+  ["patterns", "Patterns"],
+  ["film", "Film room"],
+  ["lab", "AI Lab"],
+];
 
 const METRICS: [string, string][] = [
   ["0.86 F1", "hit detection"],
@@ -103,11 +114,33 @@ export default function Home() {
         </div>
 
         <div className="order-3 lg:col-span-8 lg:col-start-1 lg:row-start-2">
-          <p className="text-mut text-[13px] leading-relaxed max-w-2xl">
+          <Link
+            href={HERO_ANALYSIS}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md text-[14.5px] font-semibold hover:opacity-90 transition-opacity"
+            style={{ background: "var(--ai)", color: "var(--contact-ink)" }}
+          >
+            See the full analysis of this match
+            <span aria-hidden="true">→</span>
+          </Link>
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-2.5">
+            <span className="kicker">ALSO INSIDE</span>
+            {HERO_VIEWS.map(([v, label]) => (
+              <Link
+                key={v}
+                href={`/m/${HERO_MATCH}/ai/${v}/`}
+                className="mono text-[10px] tracking-[0.13em] uppercase px-2 py-1 rounded border border-[var(--line)] text-mut hover:text-ink hover:border-[var(--mut)] transition-colors"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          <p className="text-mut text-[13px] leading-relaxed max-w-2xl mt-3.5">
             All England Open 2022 semi-final, Lakshya Sen vs Lee Zii Jia, a 39-shot rally from
             game 2. Nothing in this clip is hand-annotated.{" "}
             <Link href={HERO_RALLY} className="underline underline-offset-2 hover:text-ink">
-              Open this rally in the dashboard →
+              Open this rally in the film room →
             </Link>
           </p>
         </div>
