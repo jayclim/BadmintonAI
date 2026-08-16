@@ -32,7 +32,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from . import analytics, config, court, db
+from . import analytics, config, court, db, score_seq
 
 SNAP_DIR = config.REPO_ROOT / "data" / "labelfree"
 CLUTCH_FROM = 18          # keep in sync with insights.CLUTCH_FROM
@@ -60,22 +60,40 @@ def _pipeline_rallies(con, match_id: str) -> pd.DataFrame:
     return df
 
 
-def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
+def build(match_id: str, verbose: bool = True, rescan: bool = False,
+          from_snapshot: bool = False) -> dict:
     """Run the OCR, align events to pipeline rallies, snapshot to JSON.
     OCR events are reused from an existing snapshot unless rescan=True (the
-    video scan is by far the slow part; alignment logic is cheap to iterate)."""
-    from . import scoreboard
-    con = db.connect(read_only=True)
-    ral = _pipeline_rallies(con, match_id)
-    con.close()
+    video scan is by far the slow part; alignment logic is cheap to iterate).
+
+    from_snapshot rebuilds the SCORE layer from the committed snapshot alone — no
+    DuckDB, no video, no OpenCV. The rally windows and the side map are carried
+    through from the cache; everything the scoring rules touch (per-rally scores,
+    winners, set finals, rallies_missing) is recomputed. That makes a scoreline
+    reproducible on a machine that has never tracked the match, and in CI."""
+    snap_cached = (json.loads(snapshot_path(match_id).read_text())
+                   if snapshot_path(match_id).exists() else None)
+
+    if from_snapshot:
+        if not snap_cached or not snap_cached.get("rallies"):
+            raise RuntimeError(
+                f"--from-snapshot needs an existing snapshot at "
+                f"{snapshot_path(match_id)} — run a full build once with the DB first")
+        ral = pd.DataFrame(snap_cached["rallies"])
+        if "serve_side" not in ral.columns:
+            ral["serve_side"] = None      # DB-only signal; the side map is carried below
+    else:
+        con = db.connect(read_only=True)
+        ral = _pipeline_rallies(con, match_id)
+        con.close()
     if not len(ral):
         raise RuntimeError(
             f"no label-free pipeline strokes for {match_id} — run "
             f"`python -m badminton.pipeline {match_id} --label-free --write` first")
 
     ev = None
-    if not rescan and snapshot_path(match_id).exists():
-        cached = json.loads(snapshot_path(match_id).read_text()).get("events")
+    if not rescan and snap_cached:
+        cached = snap_cached.get("events")
         if cached:
             ev = pd.DataFrame(cached).rename(columns={})
             if "jump" not in ev.columns:   # older snapshots: reconstruct
@@ -89,6 +107,7 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
                     prev = e
                 ev["jump"] = jumps
     if ev is None:
+        from . import scoreboard       # imports cv2 — only needed to actually scan video
         ev = scoreboard.events(match_id)
     if not len(ev):
         raise RuntimeError("score OCR produced no events for this match")
@@ -158,6 +177,30 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
         elif (da, db_) == (0, 1):
             r["winner"] = "B"
 
+    # --- close out each game on the scoring RULES.
+    # The broadcast cuts to the crowd on set point, so the overlay's winning
+    # reading is routinely never sampled and a 21-17 set gets reported as 19-17
+    # (measured: 0/4 labeled matches had every scoreline right without this).
+    # score_seq rebuilds the legal point log — misreads dropped, skipped readings
+    # split back into the rallies they belong to, the tail finished by rule — and
+    # the last DETECTED rally of each game carries that game's true final.
+    plog = score_seq.point_log(
+        [(int(e["set_no"]), int(e["top"]), int(e["bot"]), i)
+         for i, (_, e) in enumerate(ev.iterrows())])
+    n_points: dict[int, int] = {}
+    for sn, *_ in plog:
+        n_points[sn] = n_points.get(sn, 0) + 1
+    for sn, (t, b) in score_seq.set_finals(plog).items():
+        fa, fb = (t, b) if row_a == "top" else (b, t)
+        in_set = [r for r in rows if r["set_no"] == sn]
+        if not in_set or (in_set[-1]["score_a"], in_set[-1]["score_b"]) == (fa, fb):
+            continue
+        r = in_set[-1]
+        r["score_a"], r["score_b"] = fa, fb
+        da, db_ = fa - r["prev_a"], fb - r["prev_b"]
+        if da or db_:                     # who took the game-winning rally
+            r["winner"] = "A" if da >= db_ else "B"
+
     # --- side of player A per RALLY ("winner serves next" votes, flip-aware).
     # Each winner event constrains which side the winning ROW serves the NEXT
     # rally from. Per set we fit top's side as a step function with at most ONE
@@ -221,16 +264,45 @@ def build(match_id: str, verbose: bool = True, rescan: bool = False) -> dict:
         top_side = start if (k is None or r["rally_id"] < k) else flipped[start]
         r["side_a"] = top_side if row_a == "top" else flipped[top_side]
 
-    # per-set summary (majority) kept for set-level consumers + the verbose print
+    if from_snapshot and not top_fn:
+        # Serve-side detection reads the DB, so the votes above are empty here. None of
+        # the scoring rules touch the side map — carry the cached one through unchanged
+        # rather than silently dropping every rally's side to None.
+        cached_side = {int(c["rally_key"]): c.get("side_a")
+                       for c in snap_cached["rallies"] if c.get("rally_key") is not None}
+        for r in rows:
+            r["side_a"] = cached_side.get(r["rally_key"])
+        top_fn = {int(sn): (None, int(k))
+                  for sn, k in (snap_cached.get("flips") or {}).items()}
+
+    # Per-set summary kept for set-level consumers + the verbose print. This is the side
+    # A STARTED the set on, not a majority: the deciding game changes ends at 11, so its
+    # majority is an exact tie about as often as not (All England SF set 3 is 21-21), and
+    # `max(set(...), key=...)` broke that tie in hash order — the same snapshot rebuilt
+    # twice could disagree with itself. Anything needing within-set precision uses the
+    # flip-aware per-rally sides (rally_side_map), which are unaffected.
     side_a: dict[int, str] = {}
     for sn in sets_in_rows:
         ss = [r["side_a"] for r in rows if r["set_no"] == sn and r["side_a"]]
         if ss:
-            side_a[sn] = max(set(ss), key=ss.count)
+            side_a[sn] = ss[0]
+
+    # points the rules say were played vs rallies the segmenter found: a positive
+    # gap is missed rallies, and it is the honest bound on per-rally attribution
+    # (a point whose rally was never detected cannot be attributed to it).
+    n_rallies: dict[int, int] = {}
+    for r in rows:
+        n_rallies[r["set_no"]] = n_rallies.get(r["set_no"], 0) + 1
+    missing = {str(sn): n_points.get(sn, 0) - n_rallies.get(sn, 0)
+               for sn in sorted(set(n_points) | set(n_rallies))}
 
     snap = dict(match_id=match_id, row_a=row_a,
                 side_a={str(sn): s for sn, s in side_a.items()},
                 flips={str(sn): k for sn, (_, k) in top_fn.items() if k is not None},
+                # oriented A-B (not top/bot) like every other score in the snapshot
+                set_finals={str(sn): ([t, b] if row_a == "top" else [b, t])
+                            for sn, (t, b) in score_seq.set_finals(plog).items()},
+                rallies_missing=missing,
                 rallies=rows,
                 # raw OCR readings, kept for the dashboard's OCR demo + fast rebuilds
                 events=[dict(frame=int(e["frame"]), set_no=int(e["set_no"]),
@@ -561,9 +633,12 @@ if __name__ == "__main__":
                     help="run score OCR + alignment, write the snapshot")
     ap.add_argument("--validate", action="store_true",
                     help="compare against ShuttleSet labels (labeled matches only)")
+    ap.add_argument("--from-snapshot", action="store_true",
+                    help="rebuild the score layer from the committed snapshot only "
+                         "(no DuckDB, no video, no OpenCV); side map carried through")
     args = ap.parse_args()
     if args.build:
-        build(args.match_id)
+        build(args.match_id, from_snapshot=args.from_snapshot)
     if args.validate:
         validate(args.match_id)
     if not args.build and not args.validate:

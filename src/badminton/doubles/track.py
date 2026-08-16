@@ -6,12 +6,20 @@ court half (singles), it keeps the TOP-2 per half and assigns each a STABLE slot
 written to the same `tracks` table — `tracks.player_id` already documents near2/far2.
 
 Identity is the hard part of doubles (same uniforms defeat appearance ReID; occlusion
-and crossing cause ID switches). Two mechanisms keep a slot pinned to one physical
+and crossing cause ID switches). Four mechanisms keep a slot pinned to one physical
 player across a rally:
   1. Persistence — a YOLO/ByteTrack track-id, once given a slot, keeps it.
   2. Velocity re-ID — when ByteTrack drops an id through occlusion and a new id appears
      near a lost slot's PREDICTED position (last + velocity), the slot is inherited.
-     Threshold is in court metres (resolution-independent), gated to short gaps.
+     Threshold is in court metres (resolution-independent), gated to short gaps, and
+     WIDENS with the distance the slot could plausibly have covered — the players who
+     get dropped are the fast ones, so a fixed radius rejects the recoveries that matter.
+  3. Optimal assignment — re-ID and cold fill are scored together and solved exactly
+     (tiny bipartite match), so a greedy first pick cannot lock in the crossed pairing
+     when two team-mates swap sides.
+  4. Sticky halves — players cannot cross the net, so a detection is kept on the half its
+     track was last on. A lunging far player, with the usual far-court depth error, can
+     project to court_y < NET_Y_M; without this it is handed to the near pair's slots.
 
 Slot labels are arbitrary persistence tags, NOT tactical meaning. Front/back, left/
 right and formation are derived per-frame in badminton.doubles.roles and do not care
@@ -27,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from math import log
 
 import numpy as np
 
@@ -36,11 +45,25 @@ from ..detect import ground_point  # reuse the singles ground-contact estimator
 # Stable slots per court half. Order is the preference order for a fresh assignment.
 SLOTS = {"near": ("near", "near2"), "far": ("far", "far2")}
 
-# Velocity re-ID: a dropped slot may be re-claimed by a new detection within this many
-# court metres of its predicted position. Court is 6.10 x 13.40 m; 1.5 m comfortably
-# covers a player's travel over the <~10 frame gaps ByteTrack typically loses.
-REID_RADIUS_M = 1.5
+# Velocity re-ID: a dropped slot may be re-claimed by a new detection near its predicted
+# position. Court is 6.10 x 13.40 m. The gate is NOT a constant — a player at 5 m/s covers
+# 2.5 m over a 15-frame gap, so a fixed 1.5 m rejects exactly the fast movers ByteTrack
+# drops. It scales with the travel the slot's own velocity implies.
+REID_RADIUS_M = 1.5          # base radius (a stationary slot, or one with no velocity yet)
+REID_SLACK = 1.0             # multiplier on the slot's extrapolated travel
+REID_MAX_RADIUS_M = 4.0      # ceiling; past this it is a fresh identity, not a recovery
 REID_MAX_GAP = 15            # frames; beyond this a slot's prediction is too stale to trust
+MAX_SPEED_M_PER_FRAME = 0.35  # ~10 m/s at 30 fps — clamps ground-point jitter, not real running
+
+# Cost of filling a slot with a detection that did NOT re-ID into it (no usable prediction,
+# or outside the radius). Strictly worse than any in-radius match so geometry always wins,
+# but finite: a leftover detection belongs in a free slot rather than dropped on the floor.
+COLD_COST = 100.0
+AREA_COST_W = 0.5            # metres-equivalent penalty for a 2x apparent-size mismatch
+
+# Half assignment is sticky — see mechanism 4 in the module docstring.
+HALF_FLIP_FRAMES = 5         # consecutive frames on the other side before a half flips
+HALF_MEMORY_FRAMES = 600     # forget a track-id unseen this long (ByteTrack reuses ids)
 
 
 @dataclass(eq=False)  # identity equality: holds numpy arrays, and `in`/`remove` below
@@ -58,39 +81,144 @@ class _Det:            # must match by object identity, not elementwise array co
 class _SlotState:
     last_frame: int | None = None
     last_xy: np.ndarray | None = None
+    prev_frame: int | None = None
     prev_xy: np.ndarray | None = None
+    last_area: float | None = None
+
+    def velocity(self) -> np.ndarray:
+        """Court metres PER FRAME from the last two commits (zeros if unknown).
+
+        Dividing by the real frame delta is what makes this correct under --stride and
+        across dropped frames; clamping keeps a jittery ground-point estimate from
+        throwing the prediction across the court."""
+        if (self.last_xy is None or self.prev_xy is None
+                or self.last_frame is None or self.prev_frame is None):
+            return np.zeros(2)
+        dt = self.last_frame - self.prev_frame
+        if dt <= 0:
+            return np.zeros(2)
+        v = (self.last_xy - self.prev_xy) / dt
+        speed = float(np.hypot(*v))
+        return v * (MAX_SPEED_M_PER_FRAME / speed) if speed > MAX_SPEED_M_PER_FRAME else v
 
     def predict(self, frame: int) -> np.ndarray | None:
-        """Constant-velocity extrapolation to `frame` (court metres), or None if stale."""
+        """Constant-velocity extrapolation to `frame` (court metres), or None if stale.
+
+        Scaled by the ACTUAL gap: a 15-frame gap moves fifteen frames' worth, not one."""
         if self.last_xy is None or self.last_frame is None:
             return None
-        if frame - self.last_frame > REID_MAX_GAP:
+        gap = frame - self.last_frame
+        if gap > REID_MAX_GAP:
             return None
-        if self.prev_xy is None:
-            return self.last_xy
-        return self.last_xy + (self.last_xy - self.prev_xy)
+        return self.last_xy + self.velocity() * max(gap, 0)
 
-    def commit(self, frame: int, xy: np.ndarray) -> None:
-        self.prev_xy = self.last_xy
-        self.last_xy = xy
-        self.last_frame = frame
+    def reid_radius(self, frame: int) -> float:
+        """How far from its prediction this slot will still claim a detection."""
+        if self.last_frame is None:
+            return REID_RADIUS_M
+        travel = float(np.hypot(*self.velocity())) * max(frame - self.last_frame, 0)
+        return min(REID_RADIUS_M + REID_SLACK * travel, REID_MAX_RADIUS_M)
+
+    def commit(self, frame: int, xy: np.ndarray, area: float | None = None) -> None:
+        self.prev_frame, self.prev_xy = self.last_frame, self.last_xy
+        self.last_frame, self.last_xy = frame, xy
+        if area:
+            self.last_area = area
+
+
+def _best_matching(costs: dict[tuple[int, int], float],
+                   n_dets: int, n_slots: int) -> list[tuple[int, int]]:
+    """Exact minimum-cost bipartite matching for the tiny (<=2x2) doubles case.
+
+    Brute force over every matching — seven of them at 2x2 — which is both optimal and
+    cheaper than taking a scipy dependency. Prefers the LARGEST matching, then the
+    cheapest: leaving a real player unslotted is worse than an imperfect pairing."""
+    best_key: tuple[int, float] | None = None
+    best: list[tuple[int, int]] = []
+
+    def rec(i: int, used: frozenset[int], pairs: list[tuple[int, int]], total: float) -> None:
+        nonlocal best_key, best
+        if i == n_dets:
+            key = (-len(pairs), total)
+            if best_key is None or key < best_key:
+                best_key, best = key, list(pairs)
+            return
+        for j in range(n_slots):
+            if j not in used and (i, j) in costs:
+                pairs.append((i, j))
+                rec(i + 1, used | {j}, pairs, total + costs[(i, j)])
+                pairs.pop()
+        rec(i + 1, used, pairs, total)          # or detection i takes no slot at all
+
+    rec(0, frozenset(), [], 0.0)
+    return best
 
 
 class SlotAssigner:
     """Maps per-frame detections to stable slots (near/near2, far/far2).
 
-    Keeps slots pinned via ByteTrack ids (persistence) and recovers dropped ids by
-    velocity (re-ID). Stateful across frames — one instance per tracking run."""
+    Keeps slots pinned via ByteTrack ids (persistence), recovers dropped ids by velocity
+    (re-ID over a gap-scaled radius), resolves the two together as one optimal assignment,
+    and holds each track to its own half of the net. Stateful across frames — one instance
+    per tracking run. See the module docstring for why each mechanism exists."""
 
     def __init__(self) -> None:
         self.slot_of_tid: dict[int, str] = {}
+        self.half_of_tid: dict[int, str] = {}
         self.state: dict[str, _SlotState] = {s: _SlotState() for h in SLOTS for s in SLOTS[h]}
+        self._disagree: dict[int, int] = {}     # consecutive frames a tid looked cross-net
+        self._seen: dict[int, int] = {}         # tid -> last frame seen
+        self._last_prune = 0
+
+    def _half_for(self, frame: int, d: _Det) -> str:
+        """Which half's slots this detection competes for — sticky across frames.
+
+        A track keeps the half it was last on. Nobody crosses the net mid-rally, so a
+        one-frame flip is projection error on a lunge, not a crossing. A SUSTAINED flip
+        is a real change of ends (or a reused track-id), and re-anchors."""
+        obs = court.which_half(float(d.cxy[1]))
+        self._seen[d.tid] = frame
+        prev = self.half_of_tid.get(d.tid)
+        if prev is None or prev == obs:
+            self._disagree[d.tid] = 0
+            self.half_of_tid[d.tid] = obs
+            return obs
+        self._disagree[d.tid] = n = self._disagree.get(d.tid, 0) + 1
+        if n < HALF_FLIP_FRAMES:
+            return prev
+        self._disagree[d.tid] = 0
+        self.half_of_tid[d.tid] = obs
+        self.slot_of_tid.pop(d.tid, None)       # its old slot is on the other half now
+        return obs
+
+    def _prune(self, frame: int) -> None:
+        """Forget track-ids unseen for a while: ByteTrack reuses ids, and a stale half
+        would strand a brand-new player on the wrong side of the net."""
+        if frame - self._last_prune < HALF_MEMORY_FRAMES:
+            return
+        self._last_prune = frame
+        for tid in [t for t, f in self._seen.items() if frame - f > HALF_MEMORY_FRAMES]:
+            for m in (self._seen, self.half_of_tid, self._disagree, self.slot_of_tid):
+                m.pop(tid, None)
+
+    def _cost(self, frame: int, d: _Det, slot: str) -> float:
+        """Assignment cost in court metres. An in-radius re-ID scores by distance to the
+        slot's prediction; everything else pays COLD_COST, so geometry always wins first
+        and cold fill only breaks ties among detections nothing claimed."""
+        st = self.state[slot]
+        pen = AREA_COST_W * abs(log(d.area / st.last_area)) if st.last_area and d.area > 0 else 0.0
+        pred = st.predict(frame)
+        if pred is None:
+            return COLD_COST + pen
+        dist = float(np.hypot(*(d.cxy - pred)))
+        return (dist if dist <= st.reid_radius(frame) else COLD_COST + dist) + pen
 
     def update(self, frame: int, dets: list[_Det]) -> dict[str, _Det]:
         out: dict[str, _Det] = {}
         by_half: dict[str, list[_Det]] = {"near": [], "far": []}
         for d in dets:
-            by_half[court.which_half(float(d.cxy[1]))].append(d)
+            by_half[self._half_for(frame, d)].append(d)
+        self._prune(frame)
 
         for half, slots in SLOTS.items():
             # at most 2 real players per half; drop spurious extras by smallest area
@@ -107,29 +235,19 @@ class SlotAssigner:
                 else:
                     leftover.append(d)
 
-            # pass 2 — velocity re-ID: match leftover dets to free slots by predicted pos
+            # pass 2 — velocity re-ID and cold fill, solved together as ONE optimal
+            # assignment. Scoring them jointly is what fixes the crossing case: a greedy
+            # nearest-first pass commits to its best single pair and can strand the other
+            # detection on the wrong slot, which pins the swap in for the rest of the rally.
             free = [s for s in slots if s not in taken]
-            pairs = []
-            for d in leftover:
-                for s in free:
-                    pred = self.state[s].predict(frame)
-                    if pred is not None:
-                        dist = float(np.hypot(*(d.cxy - pred)))
-                        if dist <= REID_RADIUS_M:
-                            pairs.append((dist, d, s))
-            for _, d, s in sorted(pairs, key=lambda p: p[0]):
-                if d in leftover and s in free:
-                    out[s] = d
-                    taken.add(s); free.remove(s); leftover.remove(d)
-                    self.slot_of_tid[d.tid] = s
-
-            # pass 3 — cold assignment: remaining dets fill remaining slots (rally start / lost)
-            for d, s in zip(leftover, free):
-                out[s] = d
-                self.slot_of_tid[d.tid] = s
+            costs = {(i, j): self._cost(frame, d, s)
+                     for i, d in enumerate(leftover) for j, s in enumerate(free)}
+            for i, j in _best_matching(costs, len(leftover), len(free)):
+                out[free[j]] = leftover[i]
+                self.slot_of_tid[leftover[i].tid] = free[j]
 
         for s, d in out.items():
-            self.state[s].commit(frame, d.cxy)
+            self.state[s].commit(frame, d.cxy, d.area)
         return out
 
 

@@ -3,6 +3,11 @@
 Read this first. It's the single entry point for picking up this project. Deeper detail
 lives in `docs/` and the inline docstrings; this file is the map + the hard-won gotchas.
 
+> **Picking up work in progress?** See [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) —
+> the score decoder, the doubles identity fixes and CI are shipped on
+> `claude/badminton-analytics-improvements-svr9p2`, and it lists what still has to be run
+> on a machine that has the DuckDB (the web bundles are a `export_web` behind the fix).
+
 ---
 
 ## 1. What this is
@@ -14,7 +19,38 @@ surfaces movement + tactics + pressure analytics, plus rally video clips (raw & 
 **Direction (locked):** controlled-capture eventually (any decent camera) · analytics
 dashboard first → tactical commentary later · singles first → doubles later.
 
-## 2. Current status (as of 2026-07-01)
+## 2. Current status (as of 2026-08-13)
+
+- **SCORELINES FIXED — RULE-CONSTRAINED SCORE DECODING (2026-08-13, `score_seq.py`).**
+  Every AI scoreline on the dashboard was wrong. The score was being read per rally and
+  used as-is, which throws away the fact that a badminton score is a *rule-constrained
+  monotone path* (+1 to exactly one side per rally; 21, win by 2, cap 30). Three failure
+  modes followed: (a) the broadcast cuts to the crowd on set point so the winning reading
+  is never sampled — a 21-17 set displayed as **19-17**; (b) a reading lost behind a replay
+  made every later rally in the set carry the PREVIOUS rally's score; (c) the template
+  matcher's 0/8 confusion spiked a single sample. **Measured: 0 of 4 labeled matches had
+  every set final right; now 4/4 exact.** New pure, shared, discipline-agnostic decoder
+  `score_seq.py` (`repair` → `expand` → `complete`): drops self-contradicting samples,
+  splits a multi-point jump back into the one-point rallies it actually was, and closes a
+  cut-away game out on the rules (capped at 3 fabricated points so a truncated scan is left
+  alone). Wired into `labelfree.build` (the last detected rally of each game now carries
+  that game's true final; snapshot gained `set_finals` + `rallies_missing`) and into
+  `doubles.points.clean_set_scores`. **Doubles was worse:** the old cleaner accepted ANY
+  forward move and credited the whole jump to one team — it lost **46 of 127 points** and
+  left **24 illegal transitions** in the score worm; the decoder reproduces
+  **17-21 / 21-16 / 27-25 exactly, 0 illegal transitions**. Also new: `serve_court_parity`
+  — the server's service court is fixed by their own score parity and the receiver stands
+  diagonally opposite, so the serve stance is a **free, OCR-independent parity bit on the
+  server's score** (comparing server-vs-RECEIVER, not server-vs-centre-line: 96.3% across
+  the four labeled matches vs 74–94% for the centre-line test, which loses to homography
+  error because servers hug the line). Not yet fused into the decoder — that is the next
+  step. Tests: `tests/test_score_seq.py` **16/16** (runs anywhere — both the OCR snapshots
+  and the ShuttleSet labels are checked in, so no video/DB/weights needed), doubles
+  **42/42**. NOTE: `data/labelfree/*.json` and `web/public/data/**` in git are still the
+  OLD values — re-run `labelfree --build` + `export_web` on the machine with the DuckDB.
+  **Known remaining:** per-rally score attribution is ~93% and is bounded by SEGMENTATION
+  RECALL, not by the decoder — `rallies_missing` now reports the gap per set (india 0/0,
+  denmark 0/1, all_england_sf 5/-1/-2, ws_final 7/3; negative = spurious windows).
 
 - **DOUBLES — DEAD-TIME SEGMENTATION FIX + FULL SHUTTLE OVERLAY (2026-07-01).** The scoreboard
   gate couldn't catch between-point dead time (wide shot, all 4 on court, graphic still up), so
@@ -192,6 +228,7 @@ Everything is partitioned by `match_id`. The dashboard reads a **Match** from th
 | File | Role |
 |---|---|
 | `court.py` | coordinate frame, homography apply, `which_half`, `in_court` |
+| `score_seq.py` | **rule-constrained score decoder** (pure; shared by singles + doubles, like `court`/`config`). `repair` drops self-contradicting readings (the 0/8 spike), `expand` splits a multi-point jump into the one-point rallies it really was, `complete` finishes a game the broadcast cut away from (21 / win by 2 / cap 30, ≤3 fabricated points). `point_log` = all three; `set_finals`/`sets_won` read it off. `serve_court_parity` = the free geometric parity bit on the server's score (server vs RECEIVER, 96.3% vs labels — never server vs centre line, 74%). |
 | `db.py` | DuckDB connect (`read_only` param), `init_db` from schema |
 | `config.py` | load/save `config/matches.yaml` |
 | `fetch_video.py` | yt-dlp download + frame grab |

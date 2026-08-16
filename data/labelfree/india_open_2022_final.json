@@ -6,6 +6,20 @@
   "2": "near"
  },
  "flips": {},
+ "set_finals": {
+  "1": [
+   24,
+   22
+  ],
+  "2": [
+   21,
+   17
+  ]
+ },
+ "rallies_missing": {
+  "1": 0,
+  "2": 0
+ },
  "rallies": [
   {
    "rally_key": 1,
@@ -1091,8 +1105,8 @@
    "f0": 109962,
    "f1": 110076,
    "set_no": 2,
-   "winner": null,
-   "score_a": 19,
+   "winner": "A",
+   "score_a": 21,
    "score_b": 17,
    "rally_id": 38,
    "prev_a": 19,
